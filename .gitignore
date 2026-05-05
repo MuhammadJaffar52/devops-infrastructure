@@ -1,0 +1,13 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+.env
+*.pem
+*.key
+*.crt
+*.ovpn
+
+node_modules/
+.vscode/
