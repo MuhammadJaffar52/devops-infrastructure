@@ -11,3 +11,11 @@
 
 node_modules/
 .vscode/
+node_modules/
+dist/
+build/
+*.log
+*.tfstate
+*.tfstate.backup
+.vscode/
+.DS_Store

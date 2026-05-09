@@ -1,0 +1,2 @@
+helmfiles:
+  - releases/external-secrets.yaml
