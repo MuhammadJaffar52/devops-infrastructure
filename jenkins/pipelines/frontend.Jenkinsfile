@@ -6,53 +6,58 @@ pipeline {
         ECR_REPO = "744804011934.dkr.ecr.eu-west-1.amazonaws.com/frontend"
         IMAGE_TAG = "latest"
         NAMESPACE = "app"
+        PATH = "/var/jenkins_home:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     }
 
     stages {
-
-        stage('Checkout Code') {
+        stage('Build & Push Image') {
             steps {
-                git branch: 'main',
-                url: 'https://github.com/MuhammadJaffar52/devops-infrastructure.git'
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                sh '''
-                cd apps/frontend
-                docker build -t $ECR_REPO:$IMAGE_TAG .
-                '''
-            }
-        }
-
-        stage('Login to ECR') {
-            steps {
-                sh '''
-                aws ecr get-login-password --region $AWS_REGION | \
-                docker login --username AWS --password-stdin 744804011934.dkr.ecr.eu-west-1.amazonaws.com
-                '''
-            }
-        }
-
-        stage('Push Image to ECR') {
-            steps {
-                sh '''
-                docker push $ECR_REPO:$IMAGE_TAG
-                '''
+                sh """
+                kubectl run kaniko-build \
+                  --image=gcr.io/kaniko-project/executor:latest \
+                  --restart=Never \
+                  --rm \
+                  -n jenkins \
+                  --overrides='{
+                    "spec": {
+                      "serviceAccountName": "jenkins",
+                      "containers": [{
+                        "name": "kaniko-build",
+                        "image": "gcr.io/kaniko-project/executor:latest",
+                        "args": [
+                          "--context=git://github.com/MuhammadJaffar52/devops-infrastructure#refs/heads/main",
+                          "--context-sub-path=apps/frontend",
+                          "--dockerfile=Dockerfile",
+                          "--destination=${ECR_REPO}:${IMAGE_TAG}"
+                        ],
+                        "env": [
+                          {"name": "AWS_REGION", "value": "${AWS_REGION}"},
+                          {"name": "AWS_SDK_LOAD_CONFIG", "value": "true"}
+                        ]
+                      }],
+                      "restartPolicy": "Never"
+                    }
+                  }' \
+                  --timeout=300s \
+                  -i
+                """
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh '''
+                sh """
                 kubectl set image deployment/frontend \
-                frontend=$ECR_REPO:$IMAGE_TAG \
-                -n $NAMESPACE
-
-                kubectl rollout status deployment/frontend -n $NAMESPACE
-                '''
+                  frontend=${ECR_REPO}:${IMAGE_TAG} \
+                  -n ${NAMESPACE}
+                kubectl rollout status deployment/frontend -n ${NAMESPACE}
+                """
             }
         }
+    }
+
+    post {
+        success { echo "✅ Frontend deployed successfully!" }
+        failure { echo "❌ Deployment failed" }
     }
 }
