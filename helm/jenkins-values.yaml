@@ -1,0 +1,23 @@
+persistence:
+  storageClass: gp3
+
+controller:
+  admin:
+    password: admin123
+  serviceType: ClusterIP
+
+  volumes:
+    - name: docker-sock
+      hostPath:
+        path: /var/run/docker.sock
+        type: Socket
+    - name: docker-bin
+      hostPath:
+        path: /usr/bin/docker
+        type: File
+
+  volumeMounts:
+    - name: docker-sock
+      mountPath: /var/run/docker.sock
+    - name: docker-bin
+      mountPath: /usr/bin/docker
