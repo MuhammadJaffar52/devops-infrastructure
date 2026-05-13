@@ -9,11 +9,13 @@ metadata:
   namespace: jenkins
 spec:
   serviceAccountName: jenkins
+  dnsPolicy: ClusterFirst
+
   containers:
 
   - name: sonar
     image: sonarsource/sonar-scanner-cli:latest
-    command: [sleep]
+    command: ["sleep"]
     args: ["9999999"]
     volumeMounts:
     - mountPath: /home/jenkins/agent
@@ -21,7 +23,7 @@ spec:
 
   - name: kaniko
     image: gcr.io/kaniko-project/executor:debug
-    command: [sleep]
+    command: ["sleep"]
     args: ["9999999"]
     env:
     - name: AWS_REGION
@@ -35,7 +37,7 @@ spec:
 
   - name: kubectl
     image: bitnami/kubectl:latest
-    command: [sleep]
+    command: ["sleep"]
     args: ["9999999"]
     securityContext:
       runAsUser: 0
@@ -68,18 +70,17 @@ spec:
     stage('SonarQube Analysis') {
       steps {
         container('sonar') {
+
           withSonarQubeEnv('sonarqube') {
-            withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-              sh '''
-                echo "Running SonarQube Analysis..."
-                sonar-scanner \
-                  -Dsonar.projectKey=frontend \
-                  -Dsonar.projectName=frontend \
-                  -Dsonar.sources=apps/frontend/src \
-                  -Dsonar.host.url=${SONAR_HOST_URL} \
-                  -Dsonar.token=${SONAR_TOKEN}
-              '''
-            }
+
+            sh '''
+              echo "Running SonarQube Analysis..."
+
+              sonar-scanner \
+                -Dsonar.projectKey=frontend \
+                -Dsonar.projectName=frontend \
+                -Dsonar.sources=apps/frontend/src
+            '''
           }
         }
       }
@@ -121,11 +122,14 @@ spec:
         }
       }
     }
-
   }
 
   post {
-    success { echo "✅ Pipeline Success: SonarQube + Build + Deploy completed!" }
-    failure { echo "❌ Pipeline Failed" }
+    success {
+      echo "✅ Pipeline Success: SonarQube + Build + Deploy completed!"
+    }
+    failure {
+      echo "❌ Pipeline Failed"
+    }
   }
 }
