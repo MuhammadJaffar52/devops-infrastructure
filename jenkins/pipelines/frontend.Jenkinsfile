@@ -88,7 +88,7 @@ spec:
     stage('Quality Gate') {
       steps {
         timeout(time: 10, unit: 'MINUTES') {
-          waitForQualityGate abortPipeline: true, pollInterval: 10
+          waitForQualityGate abortPipeline: true
         }
       }
     }
