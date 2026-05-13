@@ -7,43 +7,28 @@ apiVersion: v1
 kind: Pod
 metadata:
   namespace: jenkins
+
 spec:
   serviceAccountName: jenkins
-  dnsPolicy: ClusterFirst
-
   containers:
 
   - name: trivy
     image: aquasec/trivy:latest
-    tty: true
     command: ["cat"]
-    volumeMounts:
-    - mountPath: /home/jenkins/agent
-      name: workspace-volume
+    tty: true
 
   - name: kaniko
     image: gcr.io/kaniko-project/executor:debug
-    tty: true
     command: ["cat"]
+    tty: true
     env:
     - name: AWS_REGION
       value: eu-west-1
-    envFrom:
-    - secretRef:
-        name: aws-credentials
-    volumeMounts:
-    - mountPath: /home/jenkins/agent
-      name: workspace-volume
 
   - name: kubectl
     image: bitnami/kubectl:latest
-    tty: true
     command: ["cat"]
-    securityContext:
-      runAsUser: 0
-    volumeMounts:
-    - mountPath: /home/jenkins/agent
-      name: workspace-volume
+    tty: true
 
   volumes:
   - name: workspace-volume
@@ -67,36 +52,54 @@ spec:
       }
     }
 
-    stage('Trivy Security Scan') {
+    stage('Trivy Scan') {
       steps {
         container('trivy') {
-          sh '''
+          sh """
             echo "=============================="
             echo "Running Trivy Scan"
             echo "=============================="
 
-            trivy fs --severity HIGH,CRITICAL /home/jenkins/agent/workspace/frontend-pipeline || true
-
-            echo "Scan completed (non-blocking mode)"
-          '''
+            trivy fs --severity HIGH,CRITICAL --exit-code 1 .
+          """
         }
       }
     }
 
     stage('Build & Push Image') {
-      steps {
-        container('kaniko') {
-          sh """
-            /kaniko/executor \
-              --context=git://github.com/MuhammadJaffar52/devops-infrastructure.git#refs/heads/main \
-              --context-sub-path=apps/frontend \
-              --dockerfile=Dockerfile \
-              --destination=${ECR_REPO}:${IMAGE_TAG} \
-              --verbosity=info
-          """
-        }
-      }
+  steps {
+    container('kaniko') {
+      sh """
+        set -e
+
+        mkdir -p /kaniko/.docker
+
+        AWS_ACCOUNT_ID=744804011934
+        AWS_REGION=eu-west-1
+        ECR_REGISTRY=\${AWS_ACCOUNT_ID}.dkr.ecr.\${AWS_REGION}.amazonaws.com
+
+        aws ecr get-login-password --region \$AWS_REGION > /tmp/token
+
+        cat > /kaniko/.docker/config.json <<EOF
+{
+  "auths": {
+    "\${ECR_REGISTRY}": {
+      "username": "AWS",
+      "password": "$(cat /tmp/token)"
     }
+  }
+}
+EOF
+
+        /kaniko/executor \
+          --context=/home/jenkins/agent/workspace/frontend-pipeline \
+          --dockerfile=apps/frontend/Dockerfile \
+          --destination=\${ECR_REPO}:${IMAGE_TAG} \
+          --verbosity=info
+      """
+    }
+  }
+}
 
     stage('Deploy to Kubernetes') {
       steps {
@@ -116,7 +119,7 @@ spec:
 
   post {
     success {
-      echo "✅ Pipeline completed (Trivy + Build + Deploy)"
+      echo "✅ Pipeline Success: Trivy + Build + Deploy completed!"
     }
 
     failure {
