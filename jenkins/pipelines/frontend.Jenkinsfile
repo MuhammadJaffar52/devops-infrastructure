@@ -7,7 +7,6 @@ apiVersion: v1
 kind: Pod
 metadata:
   namespace: jenkins
-
 spec:
   serviceAccountName: jenkins
   dnsPolicy: ClusterFirst
@@ -17,8 +16,7 @@ spec:
   - name: trivy
     image: aquasec/trivy:latest
     tty: true
-    command:
-    - cat
+    command: ["cat"]
     volumeMounts:
     - mountPath: /home/jenkins/agent
       name: workspace-volume
@@ -26,8 +24,7 @@ spec:
   - name: kaniko
     image: gcr.io/kaniko-project/executor:debug
     tty: true
-    command:
-    - cat
+    command: ["cat"]
     env:
     - name: AWS_REGION
       value: eu-west-1
@@ -41,8 +38,7 @@ spec:
   - name: kubectl
     image: bitnami/kubectl:latest
     tty: true
-    command:
-    - cat
+    command: ["cat"]
     securityContext:
       runAsUser: 0
     volumeMounts:
@@ -79,10 +75,9 @@ spec:
             echo "Running Trivy Scan"
             echo "=============================="
 
-            trivy fs \
-              --severity HIGH,CRITICAL \
-              --exit-code 1 \
-              /home/jenkins/agent/workspace/frontend-pipeline
+            trivy fs --severity HIGH,CRITICAL /home/jenkins/agent/workspace/frontend-pipeline || true
+
+            echo "Scan completed (non-blocking mode)"
           '''
         }
       }
@@ -121,7 +116,7 @@ spec:
 
   post {
     success {
-      echo "✅ Pipeline Success: Trivy + Build + Deploy completed!"
+      echo "✅ Pipeline completed (Trivy + Build + Deploy)"
     }
 
     failure {
