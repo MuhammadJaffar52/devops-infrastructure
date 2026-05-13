@@ -16,18 +16,18 @@ spec:
 
   - name: sonar
     image: sonarsource/sonar-scanner-cli:latest
-    command: ["sleep"]
-    args: ["9999999"]
     tty: true
+    command:
+    - cat
     volumeMounts:
     - mountPath: /home/jenkins/agent
       name: workspace-volume
 
   - name: kaniko
     image: gcr.io/kaniko-project/executor:debug
-    command: ["sleep"]
-    args: ["9999999"]
     tty: true
+    command:
+    - cat
     env:
     - name: AWS_REGION
       value: eu-west-1
@@ -40,9 +40,9 @@ spec:
 
   - name: kubectl
     image: bitnami/kubectl:latest
-    command: ["sleep"]
-    args: ["9999999"]
     tty: true
+    command:
+    - cat
     securityContext:
       runAsUser: 0
     volumeMounts:
@@ -61,8 +61,6 @@ spec:
     ECR_REPO   = "744804011934.dkr.ecr.eu-west-1.amazonaws.com/frontend"
     IMAGE_TAG  = "latest"
     NAMESPACE  = "app"
-
-    SONAR_HOST_URL = "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
   }
 
   stages {
@@ -77,20 +75,35 @@ spec:
       steps {
         container('sonar') {
 
-          withCredentials([
-            string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')
-          ]) {
+          withSonarQubeEnv('sonarqube') {
 
-            sh '''
-              echo "Running SonarQube Analysis..."
+            withCredentials([
+              string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')
+            ]) {
 
-              sonar-scanner \
-                -Dsonar.projectKey=frontend \
-                -Dsonar.projectName=frontend \
-                -Dsonar.sources=apps/frontend/src \
-                -Dsonar.host.url=$SONAR_HOST_URL \
-                -Dsonar.token=$SONAR_TOKEN
-            '''
+              sh '''
+                echo "=================================="
+                echo "Testing SonarQube Connectivity"
+                echo "=================================="
+
+                echo "SONAR_HOST_URL=$SONAR_HOST_URL"
+
+                curl -u $SONAR_TOKEN: \
+                  $SONAR_HOST_URL/api/system/status
+
+                echo ""
+                echo "=================================="
+                echo "Running SonarQube Analysis"
+                echo "=================================="
+
+                sonar-scanner \
+                  -Dsonar.projectKey=frontend \
+                  -Dsonar.projectName=frontend \
+                  -Dsonar.sources=apps/frontend/src \
+                  -Dsonar.host.url=$SONAR_HOST_URL \
+                  -Dsonar.login=$SONAR_TOKEN
+              '''
+            }
           }
         }
       }
@@ -129,7 +142,8 @@ spec:
               frontend=${ECR_REPO}:${IMAGE_TAG} \
               -n ${NAMESPACE}
 
-            kubectl rollout status deployment/frontend -n ${NAMESPACE}
+            kubectl rollout status deployment/frontend \
+              -n ${NAMESPACE}
           """
         }
       }
