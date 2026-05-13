@@ -7,6 +7,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   namespace: jenkins
+
 spec:
   serviceAccountName: jenkins
   dnsPolicy: ClusterFirst
@@ -17,6 +18,7 @@ spec:
     image: sonarsource/sonar-scanner-cli:latest
     command: ["sleep"]
     args: ["9999999"]
+    tty: true
     volumeMounts:
     - mountPath: /home/jenkins/agent
       name: workspace-volume
@@ -25,6 +27,7 @@ spec:
     image: gcr.io/kaniko-project/executor:debug
     command: ["sleep"]
     args: ["9999999"]
+    tty: true
     env:
     - name: AWS_REGION
       value: eu-west-1
@@ -39,6 +42,7 @@ spec:
     image: bitnami/kubectl:latest
     command: ["sleep"]
     args: ["9999999"]
+    tty: true
     securityContext:
       runAsUser: 0
     volumeMounts:
@@ -57,6 +61,8 @@ spec:
     ECR_REPO   = "744804011934.dkr.ecr.eu-west-1.amazonaws.com/frontend"
     IMAGE_TAG  = "latest"
     NAMESPACE  = "app"
+
+    SONAR_HOST_URL = "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
   }
 
   stages {
@@ -71,7 +77,9 @@ spec:
       steps {
         container('sonar') {
 
-          withSonarQubeEnv('sonarqube') {
+          withCredentials([
+            string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')
+          ]) {
 
             sh '''
               echo "Running SonarQube Analysis..."
@@ -79,7 +87,9 @@ spec:
               sonar-scanner \
                 -Dsonar.projectKey=frontend \
                 -Dsonar.projectName=frontend \
-                -Dsonar.sources=apps/frontend/src
+                -Dsonar.sources=apps/frontend/src \
+                -Dsonar.host.url=$SONAR_HOST_URL \
+                -Dsonar.token=$SONAR_TOKEN
             '''
           }
         }
@@ -97,6 +107,7 @@ spec:
     stage('Build & Push Image') {
       steps {
         container('kaniko') {
+
           sh """
             /kaniko/executor \
               --context=git://github.com/MuhammadJaffar52/devops-infrastructure.git#refs/heads/main \
@@ -112,6 +123,7 @@ spec:
     stage('Deploy to Kubernetes') {
       steps {
         container('kubectl') {
+
           sh """
             kubectl set image deployment/frontend \
               frontend=${ECR_REPO}:${IMAGE_TAG} \
@@ -125,9 +137,11 @@ spec:
   }
 
   post {
+
     success {
       echo "✅ Pipeline Success: SonarQube + Build + Deploy completed!"
     }
+
     failure {
       echo "❌ Pipeline Failed"
     }
