@@ -1,0 +1,2 @@
+terraform/modules/vpn/certs/*.key
+terraform/modules/vpn/certs/*.crt

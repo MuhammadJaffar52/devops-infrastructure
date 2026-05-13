@@ -1,0 +1,19 @@
+community:
+  enabled: true
+
+monitoringPasscode: "admin1234"
+
+postgresql:
+  image:
+    tag: 15.6.0-debian-11-r16
+  auth:
+    password: ICY9BATZy6
+    username: sonarqube
+    database: sonarqube
+
+initSysctl:
+  enabled: true
+  vmMaxMapCount: 524288
+  fsFileMax: 131072
+  nofile: 131072
+  nproc: 8192

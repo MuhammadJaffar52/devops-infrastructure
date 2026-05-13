@@ -1,0 +1,29 @@
+repositories:
+  - name: sonarqube
+    url: https://SonarSource.github.io/helm-chart-sonarqube
+
+releases:
+  - name: sonarqube
+    namespace: sonarqube
+    createNamespace: true
+    chart: sonarqube/sonarqube
+    version: 10.6.0
+
+    values:
+      - persistence:
+          enabled: true
+          size: 10Gi
+
+      - service:
+          type: ClusterIP
+
+      - ingress:
+          enabled: false
+
+      - postgresql:
+          enabled: true
+
+      - resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
