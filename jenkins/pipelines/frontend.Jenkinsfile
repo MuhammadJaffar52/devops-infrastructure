@@ -14,8 +14,8 @@ spec:
 
   containers:
 
-  - name: sonar
-    image: sonarsource/sonar-scanner-cli:latest
+  - name: trivy
+    image: aquasec/trivy:latest
     tty: true
     command:
     - cat
@@ -71,48 +71,19 @@ spec:
       }
     }
 
-    stage('SonarQube Analysis') {
+    stage('Trivy Security Scan') {
       steps {
-        container('sonar') {
+        container('trivy') {
+          sh '''
+            echo "=============================="
+            echo "Running Trivy Scan"
+            echo "=============================="
 
-          withSonarQubeEnv('sonarqube') {
-
-            withCredentials([
-              string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')
-            ]) {
-
-              sh '''
-                echo "=================================="
-                echo "Testing SonarQube Connectivity"
-                echo "=================================="
-
-                echo "SONAR_HOST_URL=$SONAR_HOST_URL"
-
-                curl -u $SONAR_TOKEN: \
-                  $SONAR_HOST_URL/api/system/status
-
-                echo ""
-                echo "=================================="
-                echo "Running SonarQube Analysis"
-                echo "=================================="
-
-                sonar-scanner \
-                  -Dsonar.projectKey=frontend \
-                  -Dsonar.projectName=frontend \
-                  -Dsonar.sources=apps/frontend/src \
-                  -Dsonar.host.url=$SONAR_HOST_URL \
-                  -Dsonar.login=$SONAR_TOKEN
-              '''
-            }
-          }
-        }
-      }
-    }
-
-    stage('Quality Gate') {
-      steps {
-        timeout(time: 10, unit: 'MINUTES') {
-          waitForQualityGate abortPipeline: true
+            trivy fs \
+              --severity HIGH,CRITICAL \
+              --exit-code 1 \
+              /home/jenkins/agent/workspace/frontend-pipeline
+          '''
         }
       }
     }
@@ -120,7 +91,6 @@ spec:
     stage('Build & Push Image') {
       steps {
         container('kaniko') {
-
           sh """
             /kaniko/executor \
               --context=git://github.com/MuhammadJaffar52/devops-infrastructure.git#refs/heads/main \
@@ -136,7 +106,6 @@ spec:
     stage('Deploy to Kubernetes') {
       steps {
         container('kubectl') {
-
           sh """
             kubectl set image deployment/frontend \
               frontend=${ECR_REPO}:${IMAGE_TAG} \
@@ -151,9 +120,8 @@ spec:
   }
 
   post {
-
     success {
-      echo "✅ Pipeline Success: SonarQube + Build + Deploy completed!"
+      echo "✅ Pipeline Success: Trivy + Build + Deploy completed!"
     }
 
     failure {
