@@ -3,31 +3,42 @@ kind: Deployment
 metadata:
   name: backend
   namespace: app
+
 spec:
   replicas: 2
+
   selector:
     matchLabels:
       app: backend
+
   template:
     metadata:
       labels:
         app: backend
+
     spec:
       containers:
         - name: backend
-          image: 744804011934.dkr.ecr.eu-west-1.amazonaws.com/backend:latest
+
+          image: BACKEND_IMAGE
+
+          imagePullPolicy: Always
+
           ports:
             - containerPort: 3000
+
           env:
             - name: MONGO_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: mongodb-secret
                   key: MONGO_USERNAME
+
             - name: MONGO_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mongodb-secret
                   key: MONGO_PASSWORD
+
             - name: MONGO_URI
               value: "mongodb://$(MONGO_USERNAME):$(MONGO_PASSWORD)@mongodb.app.svc.cluster.local:27017/?authSource=admin"

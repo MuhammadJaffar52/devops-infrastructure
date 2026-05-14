@@ -2,7 +2,9 @@
 #!/bin/bash
 
 set -e
+export ENVIRONMENT=${ENVIRONMENT:-dev}
 
+cd terraform/environments/$ENVIRONMENT
 echo "======================================"
 echo "DevOps Infrastructure Bootstrap"
 echo "======================================"

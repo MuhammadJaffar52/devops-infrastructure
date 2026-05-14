@@ -1,5 +1,16 @@
+variable "environment" {
+  description = "Deployment environment (dev/staging/prod)"
+  type        = string
+}
+
+variable "domain_name" {
+  description = "Base domain name"
+  type        = string
+}
+
 variable "vpc_cidr" {
-  type = string
+  description = "VPC CIDR block"
+  type        = string
 }
 
 variable "server_certificate_arn" {

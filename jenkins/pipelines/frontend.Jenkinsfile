@@ -54,11 +54,9 @@ spec:
   }
 
   environment {
-    AWS_REGION     = "eu-west-1"
-    AWS_ACCOUNT_ID = "744804011934"
-    ECR_REPO       = "744804011934.dkr.ecr.eu-west-1.amazonaws.com/frontend"
-    IMAGE_TAG      = "${BUILD_NUMBER}"
-    NAMESPACE      = "app"
+    AWS_REGION = "eu-west-1"
+    IMAGE_TAG  = "${BUILD_NUMBER}"
+    NAMESPACE  = "app"
   }
 
   stages {
@@ -66,6 +64,20 @@ spec:
     stage('Checkout') {
       steps {
         checkout scm
+      }
+    }
+
+    stage('Detect AWS Account') {
+      steps {
+        container('kaniko') {
+          sh '''
+            set -e
+            echo "Detecting AWS Account ID..."
+            export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            echo $AWS_ACCOUNT_ID > aws_account.txt
+            echo "AWS Account detected: $AWS_ACCOUNT_ID"
+          '''
+        }
       }
     }
 
@@ -95,8 +107,11 @@ spec:
           sh '''
             set -e
 
+            export AWS_ACCOUNT_ID=$(cat aws_account.txt)
+            export ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/frontend"
+
             echo "=============================="
-            echo "Creating Docker Config for ECR"
+            echo "ECR Repository: $ECR_REPO"
             echo "=============================="
 
             mkdir -p /kaniko/.docker
@@ -129,9 +144,12 @@ EOF
       steps {
         container('kubectl') {
           sh '''
-            echo "=============================="
-            echo "Deploying Frontend"
-            echo "=============================="
+            set -e
+
+            export AWS_ACCOUNT_ID=$(cat aws_account.txt)
+            export ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/frontend"
+
+            echo "Deploying Image: $ECR_REPO:${IMAGE_TAG}"
 
             kubectl set image deployment/frontend \
               frontend=${ECR_REPO}:${IMAGE_TAG} \
@@ -147,7 +165,11 @@ EOF
   }
 
   post {
-    success { echo "✅ Frontend Pipeline Completed Successfully" }
-    failure { echo "❌ Frontend Pipeline Failed" }
+    success {
+      echo "✅ Frontend Pipeline Completed Successfully"
+    }
+    failure {
+      echo "❌ Frontend Pipeline Failed"
+    }
   }
 }
