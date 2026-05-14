@@ -22,6 +22,7 @@ resource "aws_security_group" "vpn_sg" {
 }
 
 resource "aws_ec2_client_vpn_endpoint" "this" {
+  count = var.server_certificate_arn != "" ? 1 : 0
   description            = "devops-client-vpn"
   server_certificate_arn = var.server_certificate_arn
   client_cidr_block      = var.client_cidr_block

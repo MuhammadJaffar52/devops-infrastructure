@@ -14,11 +14,12 @@ variable "client_cidr_block" {
   type    = string
   default = "172.16.0.0/22"
 }
-
 variable "server_certificate_arn" {
-  type = string
+  type    = string
+  default = null
 }
 
 variable "client_root_certificate_arn" {
-  type = string
+  type    = string
+  default = null
 }

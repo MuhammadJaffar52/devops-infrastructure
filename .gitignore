@@ -1,24 +1,34 @@
-.terraform/
-*.tfstate
-*.tfstate.*
-.terraform.lock.hcl
-
-.env
-*.pem
-*.key
-*.crt
-*.ovpn
-
-node_modules/
-.vscode/
-node_modules/
-dist/
-build/
-*.log
+# Terraform
 *.tfstate
 *.tfstate.backup
-.vscode/
+.terraform/
+
+# AWS / local binaries
+aws/
+kubectl
+awscliv2.zip
+
+# VPN / certificates
+*.crt
+*.key
+*.csr
+*.ovpn
+*.cnf
+*.srl
+
+# Archive
+archive/
+
+# Logs
+*.log
+
+# OS
 .DS_Store
-EasyRSA-3.1.7/
-EasyRSA-3.1.7/
-EasyRSA-3.1.7/
+
+# IDE
+.vscode/
+.idea/
+
+# Env files
+.env
+.env.*
