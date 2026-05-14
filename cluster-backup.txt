@@ -1,0 +1,153 @@
+NAMESPACE          NAME                                                         READY   STATUS    RESTARTS      AGE
+app                pod/backend-7c5fbc79c8-gsjp6                                 1/1     Running   0             4d18h
+app                pod/backend-7c5fbc79c8-vhcb4                                 1/1     Running   0             4d18h
+app                pod/frontend-8477485bcf-6khwx                                1/1     Running   0             8h
+app                pod/frontend-8477485bcf-w5msc                                1/1     Running   0             8h
+app                pod/mongodb-0                                                1/1     Running   0             4d18h
+external-secrets   pod/external-secrets-6f86679fb8-qs4hh                        1/1     Running   0             44h
+external-secrets   pod/external-secrets-cert-controller-75976d9c6b-nzckv        1/1     Running   0             44h
+external-secrets   pod/external-secrets-webhook-64b5b9c8d4-hj2q6                1/1     Running   0             44h
+jenkins            pod/jenkins-0                                                2/2     Running   5 (37h ago)   4d18h
+jenkins            pod/kaniko-test                                              0/1     Error     0             4d18h
+kube-system        pod/aws-load-balancer-controller-665cc49cd5-9tdxs            1/1     Running   0             4d18h
+kube-system        pod/aws-load-balancer-controller-665cc49cd5-pm88x            1/1     Running   0             4d18h
+kube-system        pod/aws-node-9n78h                                           2/2     Running   0             2d18h
+kube-system        pod/aws-node-ng68d                                           2/2     Running   0             4d18h
+kube-system        pod/aws-node-rwhsl                                           2/2     Running   0             2d18h
+kube-system        pod/aws-node-sf5bh                                           2/2     Running   0             4d18h
+kube-system        pod/coredns-844d698fff-rf92q                                 1/1     Running   0             4d18h
+kube-system        pod/coredns-844d698fff-v4sz9                                 1/1     Running   0             4d18h
+kube-system        pod/ebs-csi-controller-fbc8fc5b9-87xdp                       6/6     Running   0             4d18h
+kube-system        pod/ebs-csi-controller-fbc8fc5b9-94fqw                       6/6     Running   0             4d18h
+kube-system        pod/ebs-csi-node-2bs5b                                       3/3     Running   0             4d18h
+kube-system        pod/ebs-csi-node-jvc7h                                       3/3     Running   0             2d18h
+kube-system        pod/ebs-csi-node-n6ckv                                       3/3     Running   0             2d18h
+kube-system        pod/ebs-csi-node-vg86h                                       3/3     Running   0             4d18h
+kube-system        pod/kube-proxy-2d586                                         1/1     Running   0             2d18h
+kube-system        pod/kube-proxy-9tqk7                                         1/1     Running   0             4d18h
+kube-system        pod/kube-proxy-bc4w7                                         1/1     Running   0             4d18h
+kube-system        pod/kube-proxy-hs5jn                                         1/1     Running   0             2d18h
+monitoring         pod/alertmanager-monitoring-kube-prometheus-alertmanager-0   2/2     Running   0             4d18h
+monitoring         pod/loki-0                                                   2/2     Running   0             4d18h
+monitoring         pod/loki-canary-59xj8                                        1/1     Running   0             2d18h
+monitoring         pod/loki-canary-fkk8b                                        1/1     Running   0             4d18h
+monitoring         pod/loki-canary-lmgjz                                        1/1     Running   0             2d18h
+monitoring         pod/loki-canary-xklw2                                        1/1     Running   0             4d18h
+monitoring         pod/loki-gateway-654f968b44-ns65m                            1/1     Running   0             4d18h
+monitoring         pod/monitoring-grafana-96c89c88f-gshf6                       3/3     Running   0             4d18h
+monitoring         pod/monitoring-kube-prometheus-operator-54f68d65b4-5qws7     1/1     Running   0             4d18h
+monitoring         pod/monitoring-kube-state-metrics-5957bd45bc-gtr5h           1/1     Running   0             4d18h
+monitoring         pod/monitoring-prometheus-node-exporter-4rbjq                1/1     Running   0             4d18h
+monitoring         pod/monitoring-prometheus-node-exporter-8jwfz                1/1     Running   0             2d18h
+monitoring         pod/monitoring-prometheus-node-exporter-ldz7m                1/1     Running   0             2d18h
+monitoring         pod/monitoring-prometheus-node-exporter-v9z68                1/1     Running   0             4d18h
+monitoring         pod/prometheus-monitoring-kube-prometheus-prometheus-0       2/2     Running   0             7h7m
+monitoring         pod/promtail-2gxvz                                           1/1     Running   0             4d18h
+monitoring         pod/promtail-2rdwf                                           1/1     Running   0             4d18h
+monitoring         pod/promtail-jjqbr                                           1/1     Running   0             2d18h
+monitoring         pod/promtail-m5twf                                           1/1     Running   0             2d18h
+sonarqube          pod/sonarqube-sonarqube-0                                    1/1     Running   1 (29h ago)   31h
+trivy-system       pod/trivy-operator-6877748bd-rlkxd                           1/1     Running   0             7h58m
+
+NAMESPACE          NAME                                                         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                        AGE
+app                service/backend                                              ClusterIP   172.20.130.56    <none>        80/TCP                         5d19h
+app                service/frontend                                             ClusterIP   172.20.75.55     <none>        80/TCP                         5d17h
+app                service/mongodb                                              ClusterIP   None             <none>        27017/TCP                      6d12h
+default            service/kubernetes                                           ClusterIP   172.20.0.1       <none>        443/TCP                        8d
+external-secrets   service/external-secrets-webhook                             ClusterIP   172.20.192.8     <none>        443/TCP                        7d11h
+jenkins            service/jenkins                                              ClusterIP   172.20.16.120    <none>        8080/TCP                       4d22h
+jenkins            service/jenkins-agent                                        ClusterIP   172.20.254.24    <none>        50000/TCP                      4d22h
+jenkins            service/jenkins-lb                                           NodePort    172.20.91.101    <none>        8080:32080/TCP                 47h
+kube-system        service/aws-load-balancer-webhook-service                    ClusterIP   172.20.236.204   <none>        443/TCP                        8d
+kube-system        service/eks-extension-metrics-api                            ClusterIP   172.20.220.211   <none>        443/TCP                        8d
+kube-system        service/kube-dns                                             ClusterIP   172.20.0.10      <none>        53/UDP,53/TCP,9153/TCP         8d
+kube-system        service/monitoring-kube-prometheus-coredns                   ClusterIP   None             <none>        9153/TCP                       8d
+kube-system        service/monitoring-kube-prometheus-kube-controller-manager   ClusterIP   None             <none>        10257/TCP                      8d
+kube-system        service/monitoring-kube-prometheus-kube-etcd                 ClusterIP   None             <none>        2381/TCP                       8d
+kube-system        service/monitoring-kube-prometheus-kube-proxy                ClusterIP   None             <none>        10249/TCP                      8d
+kube-system        service/monitoring-kube-prometheus-kube-scheduler            ClusterIP   None             <none>        10259/TCP                      8d
+kube-system        service/monitoring-kube-prometheus-kubelet                   ClusterIP   None             <none>        10250/TCP,4194/TCP,10255/TCP   8d
+monitoring         service/alertmanager-operated                                ClusterIP   None             <none>        9093/TCP,9094/TCP,9094/UDP     8d
+monitoring         service/loki                                                 ClusterIP   172.20.222.42    <none>        3100/TCP,9095/TCP              7d15h
+monitoring         service/loki-canary                                          ClusterIP   172.20.241.51    <none>        3500/TCP                       7d15h
+monitoring         service/loki-gateway                                         ClusterIP   172.20.9.252     <none>        80/TCP                         7d15h
+monitoring         service/loki-headless                                        ClusterIP   None             <none>        3100/TCP                       7d15h
+monitoring         service/loki-memberlist                                      ClusterIP   None             <none>        7946/TCP                       7d15h
+monitoring         service/monitoring-grafana                                   ClusterIP   172.20.70.194    <none>        80/TCP                         8d
+monitoring         service/monitoring-kube-prometheus-alertmanager              ClusterIP   172.20.247.82    <none>        9093/TCP,8080/TCP              8d
+monitoring         service/monitoring-kube-prometheus-operator                  ClusterIP   172.20.174.51    <none>        443/TCP                        8d
+monitoring         service/monitoring-kube-prometheus-prometheus                ClusterIP   172.20.40.103    <none>        9090/TCP,8080/TCP              8d
+monitoring         service/monitoring-kube-state-metrics                        ClusterIP   172.20.223.132   <none>        8080/TCP                       8d
+monitoring         service/monitoring-prometheus-node-exporter                  ClusterIP   172.20.230.4     <none>        9100/TCP                       8d
+monitoring         service/prometheus-operated                                  ClusterIP   None             <none>        9090/TCP                       8d
+monitoring         service/promtail-metrics                                     ClusterIP   None             <none>        3101/TCP                       7d17h
+sonarqube          service/sonarqube-sonarqube                                  ClusterIP   172.20.53.40     <none>        9000/TCP                       44h
+trivy-system       service/trivy-operator                                       ClusterIP   None             <none>        80/TCP                         7h58m
+
+NAMESPACE     NAME                                                 DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR              AGE
+kube-system   daemonset.apps/aws-node                              4         4         4       4            4           <none>                     8d
+kube-system   daemonset.apps/ebs-csi-node                          4         4         4       4            4           kubernetes.io/os=linux     7d14h
+kube-system   daemonset.apps/ebs-csi-node-windows                  0         0         0       0            0           kubernetes.io/os=windows   7d14h
+kube-system   daemonset.apps/kube-proxy                            4         4         4       4            4           <none>                     8d
+monitoring    daemonset.apps/loki-canary                           4         4         4       4            4           <none>                     7d15h
+monitoring    daemonset.apps/monitoring-prometheus-node-exporter   4         4         4       4            4           kubernetes.io/os=linux     8d
+monitoring    daemonset.apps/promtail                              4         4         4       4            4           <none>                     7d17h
+
+NAMESPACE          NAME                                                  READY   UP-TO-DATE   AVAILABLE   AGE
+app                deployment.apps/backend                               2/2     2            2           5d20h
+app                deployment.apps/frontend                              2/2     2            2           5d17h
+external-secrets   deployment.apps/external-secrets                      1/1     1            1           7d11h
+external-secrets   deployment.apps/external-secrets-cert-controller      1/1     1            1           7d11h
+external-secrets   deployment.apps/external-secrets-webhook              1/1     1            1           7d11h
+kube-system        deployment.apps/aws-load-balancer-controller          2/2     2            2           8d
+kube-system        deployment.apps/coredns                               2/2     2            2           8d
+kube-system        deployment.apps/ebs-csi-controller                    2/2     2            2           7d14h
+monitoring         deployment.apps/loki-gateway                          1/1     1            1           7d15h
+monitoring         deployment.apps/monitoring-grafana                    1/1     1            1           8d
+monitoring         deployment.apps/monitoring-kube-prometheus-operator   1/1     1            1           8d
+monitoring         deployment.apps/monitoring-kube-state-metrics         1/1     1            1           8d
+trivy-system       deployment.apps/trivy-operator                        1/1     1            1           7h58m
+
+NAMESPACE          NAME                                                             DESIRED   CURRENT   READY   AGE
+app                replicaset.apps/backend-5955fdc4bc                               0         0         0       5d19h
+app                replicaset.apps/backend-6d998965d6                               0         0         0       5d20h
+app                replicaset.apps/backend-746d7f686f                               0         0         0       5d20h
+app                replicaset.apps/backend-79994d5759                               0         0         0       5d19h
+app                replicaset.apps/backend-7b54cc8c64                               0         0         0       5d20h
+app                replicaset.apps/backend-7c5fbc79c8                               2         2         2       5d19h
+app                replicaset.apps/frontend-554f7668c6                              0         0         0       5d17h
+app                replicaset.apps/frontend-5889646744                              0         0         0       5d17h
+app                replicaset.apps/frontend-5d744f7888                              0         0         0       5d17h
+app                replicaset.apps/frontend-7c7c7cdc54                              0         0         0       5d17h
+app                replicaset.apps/frontend-7f9589fbff                              0         0         0       5d17h
+app                replicaset.apps/frontend-8477485bcf                              2         2         2       8h
+app                replicaset.apps/frontend-c78df7d6f                               0         0         0       5d17h
+external-secrets   replicaset.apps/external-secrets-6f86679fb8                      1         1         1       44h
+external-secrets   replicaset.apps/external-secrets-75964fd6f7                      0         0         0       6d14h
+external-secrets   replicaset.apps/external-secrets-7b6487cb85                      0         0         0       7d11h
+external-secrets   replicaset.apps/external-secrets-c57dd7d89                       0         0         0       6d13h
+external-secrets   replicaset.apps/external-secrets-cert-controller-75976d9c6b      1         1         1       44h
+external-secrets   replicaset.apps/external-secrets-cert-controller-8454c9c478      0         0         0       7d11h
+external-secrets   replicaset.apps/external-secrets-webhook-64b5b9c8d4              1         1         1       44h
+external-secrets   replicaset.apps/external-secrets-webhook-67b9f89758              0         0         0       7d11h
+kube-system        replicaset.apps/aws-load-balancer-controller-5f98757d68          0         0         0       7d18h
+kube-system        replicaset.apps/aws-load-balancer-controller-665cc49cd5          2         2         2       7d17h
+kube-system        replicaset.apps/aws-load-balancer-controller-7b9684cc68          0         0         0       7d17h
+kube-system        replicaset.apps/aws-load-balancer-controller-8d4fbb487           0         0         0       8d
+kube-system        replicaset.apps/coredns-844d698fff                               2         2         2       8d
+kube-system        replicaset.apps/ebs-csi-controller-fbc8fc5b9                     2         2         2       7d14h
+monitoring         replicaset.apps/loki-gateway-654f968b44                          1         1         1       7d15h
+monitoring         replicaset.apps/monitoring-grafana-586ccb9fc5                    0         0         0       7d15h
+monitoring         replicaset.apps/monitoring-grafana-7c54b6f695                    0         0         0       8d
+monitoring         replicaset.apps/monitoring-grafana-96c89c88f                     1         1         1       7d13h
+monitoring         replicaset.apps/monitoring-kube-prometheus-operator-54f68d65b4   1         1         1       8d
+monitoring         replicaset.apps/monitoring-kube-state-metrics-5957bd45bc         1         1         1       8d
+trivy-system       replicaset.apps/trivy-operator-6877748bd                         1         1         1       7h58m
+
+NAMESPACE    NAME                                                                    READY   AGE
+app          statefulset.apps/mongodb                                                1/1     6d12h
+jenkins      statefulset.apps/jenkins                                                1/1     4d22h
+monitoring   statefulset.apps/alertmanager-monitoring-kube-prometheus-alertmanager   1/1     8d
+monitoring   statefulset.apps/loki                                                   1/1     7d15h
+monitoring   statefulset.apps/prometheus-monitoring-kube-prometheus-prometheus       1/1     8d
+sonarqube    statefulset.apps/sonarqube-sonarqube                                    1/1     44h
