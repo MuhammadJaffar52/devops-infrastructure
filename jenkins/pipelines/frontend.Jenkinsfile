@@ -2,16 +2,13 @@ pipeline {
   agent {
     kubernetes {
       inheritFrom 'jenkins'
-
       yaml """
 apiVersion: v1
 kind: Pod
 metadata:
   namespace: jenkins
-
 spec:
   serviceAccountName: jenkins
-
   containers:
 
   - name: trivy
@@ -19,6 +16,9 @@ spec:
     command:
       - cat
     tty: true
+    volumeMounts:
+    - mountPath: /home/jenkins/agent
+      name: workspace-volume
 
   - name: kaniko
     image: gcr.io/kaniko-project/executor:debug
@@ -28,24 +28,37 @@ spec:
     env:
       - name: AWS_REGION
         value: eu-west-1
+    envFrom:
+      - secretRef:
+          name: aws-credentials
+    volumeMounts:
+    - mountPath: /home/jenkins/agent
+      name: workspace-volume
 
   - name: kubectl
     image: bitnami/kubectl:latest
     command:
       - cat
     tty: true
+    securityContext:
+      runAsUser: 0
+    volumeMounts:
+    - mountPath: /home/jenkins/agent
+      name: workspace-volume
+
+  volumes:
+  - name: workspace-volume
+    emptyDir: {}
 """
     }
   }
 
   environment {
-    AWS_REGION = "eu-west-1"
+    AWS_REGION     = "eu-west-1"
     AWS_ACCOUNT_ID = "744804011934"
-
-    ECR_REPO = "744804011934.dkr.ecr.eu-west-1.amazonaws.com/frontend"
-    IMAGE_TAG = "${BUILD_NUMBER}"
-
-    NAMESPACE = "app"
+    ECR_REPO       = "744804011934.dkr.ecr.eu-west-1.amazonaws.com/frontend"
+    IMAGE_TAG      = "${BUILD_NUMBER}"
+    NAMESPACE      = "app"
   }
 
   stages {
@@ -79,27 +92,19 @@ spec:
     stage('Build & Push Image') {
       steps {
         container('kaniko') {
-
           sh '''
             set -e
 
             echo "=============================="
-            echo "Creating Docker Config"
+            echo "Creating Docker Config for ECR"
             echo "=============================="
 
             mkdir -p /kaniko/.docker
 
-            TOKEN=$(wget -qO- \
-              --header="X-aws-ec2-metadata-token-ttl-seconds: 21600" \
-              --method PUT \
-              "http://169.254.169.254/latest/api/token" || true)
-
-            echo "Using IRSA / IAM permissions"
-
             cat > /kaniko/.docker/config.json <<EOF
 {
-  "credHelpers": {
-    "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com": "ecr-login"
+  "auths": {
+    "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com": {}
   }
 }
 EOF
@@ -122,9 +127,7 @@ EOF
 
     stage('Deploy to Kubernetes') {
       steps {
-
         container('kubectl') {
-
           sh '''
             echo "=============================="
             echo "Deploying Frontend"
@@ -140,16 +143,11 @@ EOF
         }
       }
     }
+
   }
 
   post {
-
-    success {
-      echo "✅ Frontend Pipeline Completed Successfully"
-    }
-
-    failure {
-      echo "❌ Frontend Pipeline Failed"
-    }
+    success { echo "✅ Frontend Pipeline Completed Successfully" }
+    failure { echo "❌ Frontend Pipeline Failed" }
   }
 }
