@@ -1,4 +1,7 @@
-vpc_cidr = "10.0.0.0/16"
+environment = "prod"
 
-server_certificate_arn = "arn:aws:acm:eu-west-1:xxxx:certificate/xxx"
-client_root_certificate_arn = "arn:aws:acm:eu-west-1:xxxx:certificate/xxx"
+aws_region = "eu-west-1"
+
+vpc_cidr = "10.2.0.0/16"
+
+domain_name = "prod.internal"

@@ -1,3 +1,9 @@
+variable "aws_region" {
+description = "AWS region"
+type        = string
+}
+
+
 variable "environment" {
   description = "Deployment environment (dev/staging/prod)"
   type        = string

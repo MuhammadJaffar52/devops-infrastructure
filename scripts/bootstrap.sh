@@ -1,41 +1,29 @@
-```bash
 #!/bin/bash
 
 set -e
+
 export ENVIRONMENT=${ENVIRONMENT:-dev}
 
-cd terraform/environments/$ENVIRONMENT
 echo "======================================"
 echo "DevOps Infrastructure Bootstrap"
 echo "======================================"
 
+ROOT_DIR=$(pwd)
+
 echo ""
 echo "Checking dependencies..."
 
-command -v aws >/dev/null 2>&1 || {
-  echo "AWS CLI not installed"
-  exit 1
-}
-
-command -v kubectl >/dev/null 2>&1 || {
-  echo "kubectl not installed"
-  exit 1
-}
-
-command -v terraform >/dev/null 2>&1 || {
-  echo "Terraform not installed"
-  exit 1
-}
-
-command -v helm >/dev/null 2>&1 || {
-  echo "Helm not installed"
-  exit 1
-}
+for cmd in aws kubectl terraform helm helmfile; do
+  command -v $cmd >/dev/null 2>&1 || {
+    echo "$cmd not installed"
+    exit 1
+  }
+done
 
 echo ""
 echo "Initializing Terraform..."
 
-cd terraform/environments/dev
+cd terraform/environments/$ENVIRONMENT
 
 terraform init
 
@@ -47,17 +35,28 @@ terraform apply -auto-approve
 echo ""
 echo "Updating kubeconfig..."
 
+CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
+
+AWS_REGION=$(terraform output -raw aws_region)
+
 aws eks update-kubeconfig \
-  --region eu-west-1 \
-  --name devops-eks
+  --region $AWS_REGION \
+  --name $CLUSTER_NAME
 
 echo ""
 echo "Deploying Helm releases..."
 
-cd ../../../helm
+cd $ROOT_DIR/helm
 
 helmfile sync
 
 echo ""
+echo "Deploying Kubernetes apps..."
+
+cd $ROOT_DIR
+
+kubectl apply -f k8s/base/
+kubectl apply -f k8s/apps/
+
+echo ""
 echo "Bootstrap completed successfully."
-```

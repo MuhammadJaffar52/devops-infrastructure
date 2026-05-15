@@ -2,7 +2,7 @@
 
 ## 1. Clone Repository
 
-git clone <repo>
+git clone https://github.com/MuhammadJaffar52/devops-infrastructure.git
 
 ## 2. Configure AWS CLI
 
