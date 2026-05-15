@@ -3,61 +3,18 @@ pipeline {
     kubernetes {
       inheritFrom 'jenkins'
       yaml """
-apiVersion: v1
-kind: Pod
-metadata:
-  namespace: jenkins
-spec:
-  serviceAccountName: jenkins
-  containers:
-
-  - name: trivy
-    image: aquasec/trivy:latest
-    command:
-      - cat
-    tty: true
-    volumeMounts:
-    - mountPath: /home/jenkins/agent
-      name: workspace-volume
-
-  - name: kaniko
-    image: gcr.io/kaniko-project/executor:debug
-    command:
-      - cat
-    tty: true
-    env:
-      - name: AWS_REGION
-        value: eu-west-1
-    envFrom:
-      - secretRef:
-          name: aws-credentials
-    volumeMounts:
-    - mountPath: /home/jenkins/agent
-      name: workspace-volume
-
-  - name: kubectl
-    image: bitnami/kubectl:latest
-    command:
-      - cat
-    tty: true
-    securityContext:
-      runAsUser: 0
-    volumeMounts:
-    - mountPath: /home/jenkins/agent
-      name: workspace-volume
-
-  volumes:
-  - name: workspace-volume
-    emptyDir: {}
+# pod yaml
 """
     }
   }
 
-  // environment {
-  //   AWS_REGION = "eu-west-1"
-  //   IMAGE_TAG  = "${BUILD_NUMBER}"
-  //   NAMESPACE  = "app"
-  // }
+  environment {
+    AWS_REGION     = "eu-west-1"
+    AWS_ACCOUNT_ID = "744804011934"
+    ECR_REPO       = "frontend"
+    IMAGE_TAG      = "${BUILD_NUMBER}"
+    NAMESPACE      = "app"
+  }
 
   stages {
 
@@ -67,29 +24,15 @@ spec:
       }
     }
 
-   environment {
-    AWS_REGION     = "eu-west-1"
-    AWS_ACCOUNT_ID = "744804011934"
-    ECR_REPO       = "frontend"
-    IMAGE_TAG      = "${BUILD_NUMBER}"
-    NAMESPACE      = "app"
-}
-
     stage('Trivy Security Scan') {
       steps {
         container('trivy') {
           sh '''
-            echo "=============================="
-            echo "Running Trivy Scan"
-            echo "=============================="
-
             trivy fs \
               --severity HIGH,CRITICAL \
               --scanners vuln \
               --exit-code 0 \
               .
-
-            echo "Scan completed"
           '''
         }
       }
@@ -101,11 +44,9 @@ spec:
           sh '''
             set -e
 
-            export AWS_ACCOUNT_ID=$(cat aws_account.txt)
             export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
-            echo "=============================="
-            echo "ECR Repository: $ECR_REPO"
-            echo "=============================="
+
+            echo "Using Repo: $FULL_ECR_REPO"
 
             mkdir -p /kaniko/.docker
 
@@ -117,15 +58,11 @@ spec:
 }
 EOF
 
-            echo "=============================="
-            echo "Building & Pushing Image"
-            echo "=============================="
-
             /kaniko/executor \
               --context=/home/jenkins/agent/workspace/frontend-pipeline/apps/frontend \
               --dockerfile=/home/jenkins/agent/workspace/frontend-pipeline/apps/frontend/Dockerfile \
-              --destination=${ECR_REPO}:${IMAGE_TAG} \
-              --destination=${ECR_REPO}:latest \
+              --destination=${FULL_ECR_REPO}:${IMAGE_TAG} \
+              --destination=${FULL_ECR_REPO}:latest \
               --cache=true \
               --verbosity=info
           '''
@@ -139,13 +76,10 @@ EOF
           sh '''
             set -e
 
-            export AWS_ACCOUNT_ID=$(cat aws_account.txt)
-            export ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/frontend"
-
-            echo "Deploying Image: $ECR_REPO:${IMAGE_TAG}"
+            export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
 
             kubectl set image deployment/frontend \
-              frontend=${ECR_REPO}:${IMAGE_TAG} \
+              frontend=${FULL_ECR_REPO}:${IMAGE_TAG} \
               -n ${NAMESPACE}
 
             kubectl rollout status deployment/frontend \
@@ -161,6 +95,7 @@ EOF
     success {
       echo "✅ Frontend Pipeline Completed Successfully"
     }
+
     failure {
       echo "❌ Frontend Pipeline Failed"
     }
