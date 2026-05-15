@@ -53,11 +53,11 @@ spec:
     }
   }
 
-  environment {
-    AWS_REGION = "eu-west-1"
-    IMAGE_TAG  = "${BUILD_NUMBER}"
-    NAMESPACE  = "app"
-  }
+  // environment {
+  //   AWS_REGION = "eu-west-1"
+  //   IMAGE_TAG  = "${BUILD_NUMBER}"
+  //   NAMESPACE  = "app"
+  // }
 
   stages {
 
@@ -67,19 +67,13 @@ spec:
       }
     }
 
-    stage('Detect AWS Account') {
-      steps {
-        container('kaniko') {
-          sh '''
-            set -e
-            echo "Detecting AWS Account ID..."
-            export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            echo $AWS_ACCOUNT_ID > aws_account.txt
-            echo "AWS Account detected: $AWS_ACCOUNT_ID"
-          '''
-        }
-      }
-    }
+   environment {
+    AWS_REGION     = "eu-west-1"
+    AWS_ACCOUNT_ID = "744804011934"
+    ECR_REPO       = "frontend"
+    IMAGE_TAG      = "${BUILD_NUMBER}"
+    NAMESPACE      = "app"
+}
 
     stage('Trivy Security Scan') {
       steps {
@@ -108,8 +102,7 @@ spec:
             set -e
 
             export AWS_ACCOUNT_ID=$(cat aws_account.txt)
-            export ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/frontend"
-
+            export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
             echo "=============================="
             echo "ECR Repository: $ECR_REPO"
             echo "=============================="
