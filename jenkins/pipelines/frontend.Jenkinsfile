@@ -12,7 +12,7 @@ serviceAccountName: jenkins
 
 containers:
 
-* name: trivy
+// * name: trivy
   image: aquasec/trivy:latest
   command:
 
