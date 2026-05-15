@@ -67,7 +67,6 @@ NAMESPACE      = "app"
 
 stages {
 
-```
 stage('Checkout') {
   steps {
     checkout scm
@@ -109,7 +108,7 @@ stage('Build & Push Image') {
         mkdir -p /kaniko/.docker
 
         cat > /kaniko/.docker/config.json <<EOF
-```
+
 
 {
 "auths": {
@@ -118,7 +117,7 @@ stage('Build & Push Image') {
 }
 EOF
 
-```
+
         echo "=============================="
         echo "Building & Pushing Image"
         echo "=============================="
@@ -155,7 +154,7 @@ stage('Deploy to Kubernetes') {
     }
   }
 }
-```
+
 
 }
 
@@ -164,11 +163,11 @@ success {
 echo "✅ Frontend Pipeline Completed Successfully"
 }
 
-```
+
 failure {
   echo "❌ Frontend Pipeline Failed"
 }
-```
+
 
 }
 }
