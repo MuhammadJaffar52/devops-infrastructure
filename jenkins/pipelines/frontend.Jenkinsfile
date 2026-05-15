@@ -1,28 +1,25 @@
+   groovy
 pipeline {
+
     agent {
         kubernetes {
             inheritFrom 'jenkins'
 
             /*
             ============================================================
-            PHASE 1 IMPROVEMENT
+            PHASE 2 IMPROVEMENT
             ------------------------------------------------------------
-            REMOVED HARDCODED VALUES FROM POD YAML
-
-            OLD:
-            value: eu-west-1
-
-            NEW:
-            value: ${params.AWS_REGION}
-
-            Now AWS region becomes dynamic and reusable
-            across all AWS accounts and regions.
+            AWS REGION NOW COMES FROM:
+            configs/dev.env
+            configs/staging.env
+            configs/prod.env
             ============================================================
             */
 
             yaml """
 apiVersion: v1
 kind: Pod
+
 metadata:
   namespace: jenkins
 
@@ -36,22 +33,18 @@ spec:
       command:
         - cat
       tty: true
+
       volumeMounts:
         - mountPath: /home/jenkins/agent
           name: workspace-volume
 
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
+
       command:
         - cat
-      tty: true
 
-      # =========================================================
-      # DYNAMIC AWS REGION
-      # =========================================================
-      env:
-        - name: AWS_REGION
-          value: "${params.AWS_REGION}"
+      tty: true
 
       envFrom:
         - secretRef:
@@ -63,8 +56,10 @@ spec:
 
     - name: kubectl
       image: bitnami/kubectl:latest
+
       command:
         - cat
+
       tty: true
 
       securityContext:
@@ -82,113 +77,22 @@ spec:
     }
 
     /*
-    ================================================================
-    PHASE 1 IMPROVEMENT
-    ----------------------------------------------------------------
-    ALL HARDCODED VALUES REMOVED
+    ============================================================
+    PHASE 2 IMPROVEMENT
+    ------------------------------------------------------------
+    ONLY ENVIRONMENT SELECTION REMAINS
 
-    OLD:
-    AWS_REGION     = "eu-west-1"
-    AWS_ACCOUNT_ID = "744804011934"
-    ECR_REPO       = "frontend"
-    NAMESPACE      = "app"
-
-    NEW:
-    Everything comes dynamically from Jenkins Parameters.
-    ================================================================
+    Everything else loads automatically from:
+    configs/<environment>.env
+    ============================================================
     */
 
     parameters {
 
-        /*
-        ============================================================
-        AWS REGION PARAMETER
-        ------------------------------------------------------------
-        User can deploy in ANY AWS REGION now.
-        ============================================================
-        */
-        string(
-            name: 'AWS_REGION',
-            defaultValue: 'eu-west-1',
-            description: 'AWS Region'
-        )
-
-        /*
-        ============================================================
-        ECR REPOSITORY PARAMETER
-        ------------------------------------------------------------
-        No hardcoded frontend/backend repository anymore.
-        ============================================================
-        */
-        string(
-            name: 'ECR_REPO',
-            defaultValue: 'frontend',
-            description: 'ECR Repository Name'
-        )
-
-        /*
-        ============================================================
-        KUBERNETES NAMESPACE PARAMETER
-        ------------------------------------------------------------
-        Namespace is now configurable.
-        ============================================================
-        */
-        string(
-            name: 'NAMESPACE',
-            defaultValue: 'app',
-            description: 'Kubernetes Namespace'
-        )
-
-        /*
-        ============================================================
-        DEPLOYMENT NAME PARAMETER
-        ------------------------------------------------------------
-        Makes deployment reusable for frontend/backend/etc.
-        ============================================================
-        */
-        string(
-            name: 'DEPLOYMENT_NAME',
-            defaultValue: 'frontend',
-            description: 'Kubernetes Deployment Name'
-        )
-
-        /*
-        ============================================================
-        CONTAINER NAME PARAMETER
-        ------------------------------------------------------------
-        Removes hardcoded container name.
-        ============================================================
-        */
-        string(
-            name: 'CONTAINER_NAME',
-            defaultValue: 'frontend',
-            description: 'Container Name Inside Deployment'
-        )
-
-        /*
-        ============================================================
-        DOCKER CONTEXT PARAMETER
-        ------------------------------------------------------------
-        Makes Jenkinsfile reusable for ANY application.
-        ============================================================
-        */
-        string(
-            name: 'DOCKER_CONTEXT',
-            defaultValue: 'apps/frontend',
-            description: 'Docker Build Context'
-        )
-
-        /*
-        ============================================================
-        DOCKERFILE PATH PARAMETER
-        ------------------------------------------------------------
-        Dynamic Dockerfile path.
-        ============================================================
-        */
-        string(
-            name: 'DOCKERFILE_PATH',
-            defaultValue: 'apps/frontend/Dockerfile',
-            description: 'Dockerfile Path'
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'staging', 'prod'],
+            description: 'Select Deployment Environment'
         )
     }
 
@@ -196,33 +100,20 @@ spec:
 
         /*
         ============================================================
-        DYNAMIC VALUES FROM JENKINS PARAMETERS
+        BUILD NUMBER
         ============================================================
         */
 
-        AWS_REGION     = "${params.AWS_REGION}"
-        ECR_REPO       = "${params.ECR_REPO}"
-        IMAGE_TAG      = "${BUILD_NUMBER}"
-        NAMESPACE      = "${params.NAMESPACE}"
-        DEPLOYMENT_NAME = "${params.DEPLOYMENT_NAME}"
-        CONTAINER_NAME  = "${params.CONTAINER_NAME}"
-
-        /*
-        ============================================================
-        PHASE 1 MAJOR IMPROVEMENT
-        ------------------------------------------------------------
-        REMOVED HARDCODED AWS ACCOUNT ID
-
-        OLD:
-        AWS_ACCOUNT_ID = "744804011934"
-
-        NEW:
-        Dynamically detected during runtime using AWS CLI.
-        ============================================================
-        */
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
+
+        /*
+        ============================================================
+        CHECKOUT
+        ============================================================
+        */
 
         stage('Checkout') {
             steps {
@@ -232,22 +123,60 @@ spec:
 
         /*
         ============================================================
-        NEW STAGE
+        LOAD CENTRALIZED CONFIGURATION
         ------------------------------------------------------------
-        DYNAMIC AWS ACCOUNT DETECTION
+        Loads:
+        configs/dev.env
+        configs/staging.env
+        configs/prod.env
+        ============================================================
+        */
 
-        This makes project portable across:
-        - Personal AWS accounts
-        - Company AWS accounts
-        - Any AWS account globally
+        stage('Load Environment Config') {
+
+            steps {
+
+                container('kaniko') {
+
+                    sh '''
+                        set -e
+
+                        echo "=================================="
+                        echo "Loading Environment Configuration"
+                        echo "=================================="
+
+                        export ENVIRONMENT=${ENVIRONMENT}
+
+                        chmod +x scripts/load-env.sh
+
+                        source scripts/load-env.sh
+
+                        echo ""
+                        echo "Loaded Environment Variables:"
+                        echo ""
+
+                        env | grep -E 'AWS_REGION|FRONTEND|APP_NAMESPACE'
+                    '''
+                }
+            }
+        }
+
+        /*
+        ============================================================
+        DYNAMIC AWS ACCOUNT DETECTION
         ============================================================
         */
 
         stage('Detect AWS Account ID') {
+
             steps {
+
                 container('kaniko') {
+
                     sh '''
                         set -e
+
+                        source scripts/load-env.sh
 
                         echo "=================================="
                         echo "Detecting AWS Account ID"
@@ -257,24 +186,37 @@ spec:
                           --query Account \
                           --output text)
 
+                        echo ""
                         echo "Detected AWS Account ID:"
-                        echo $AWS_ACCOUNT_ID
+                        echo "$AWS_ACCOUNT_ID"
 
+                        echo ""
                         echo "=================================="
 
-                        echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" > account.env
+                        cat > account.env <<EOF
+AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID
+EOF
                     '''
                 }
             }
         }
 
+        /*
+        ============================================================
+        TRIVY SECURITY SCAN
+        ============================================================
+        */
+
         stage('Trivy Security Scan') {
+
             steps {
+
                 container('trivy') {
+
                     sh '''
-                        echo "=============================="
-                        echo "Running Trivy Scan"
-                        echo "=============================="
+                        echo "=================================="
+                        echo "Running Trivy Security Scan"
+                        echo "=================================="
 
                         trivy fs \
                           --severity HIGH,CRITICAL \
@@ -282,29 +224,43 @@ spec:
                           --exit-code 0 \
                           .
 
-                        echo "=============================="
-                        echo "Scan completed"
-                        echo "=============================="
+                        echo ""
+                        echo "=================================="
+                        echo "Trivy Scan Completed"
+                        echo "=================================="
                     '''
                 }
             }
         }
 
+        /*
+        ============================================================
+        BUILD & PUSH IMAGE
+        ============================================================
+        */
+
         stage('Build & Push Image') {
+
             steps {
+
                 container('kaniko') {
 
                     sh '''
                         set -e
 
+                        source scripts/load-env.sh
                         source account.env
 
-                        export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
+                        export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_ECR_REPO}"
 
-                        echo "=============================="
-                        echo "Using Repo:"
+                        echo "=================================="
+                        echo "Using ECR Repository"
+                        echo "=================================="
+
                         echo "$FULL_ECR_REPO"
-                        echo "=============================="
+
+                        echo ""
+                        echo "=================================="
 
                         mkdir -p /kaniko/.docker
 
@@ -316,13 +272,13 @@ spec:
 }
 EOF
 
-                        echo "=============================="
-                        echo "Building & Pushing Image"
-                        echo "=============================="
+                        echo "=================================="
+                        echo "Building & Pushing Docker Image"
+                        echo "=================================="
 
                         /kaniko/executor \
-                          --context=/home/jenkins/agent/workspace/frontend-pipeline/${DOCKER_CONTEXT} \
-                          --dockerfile=/home/jenkins/agent/workspace/frontend-pipeline/${DOCKERFILE_PATH} \
+                          --context=/home/jenkins/agent/workspace/frontend-pipeline/${FRONTEND_DOCKER_CONTEXT} \
+                          --dockerfile=/home/jenkins/agent/workspace/frontend-pipeline/${FRONTEND_DOCKERFILE} \
                           --destination=${FULL_ECR_REPO}:${IMAGE_TAG} \
                           --destination=${FULL_ECR_REPO}:latest \
                           --cache=true \
@@ -332,55 +288,81 @@ EOF
             }
         }
 
+        /*
+        ============================================================
+        DEPLOY TO KUBERNETES
+        ============================================================
+        */
+
         stage('Deploy to Kubernetes') {
+
             steps {
+
                 container('kubectl') {
 
                     sh '''
                         set -e
 
+                        source scripts/load-env.sh
                         source account.env
 
-                        export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
+                        export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_ECR_REPO}"
 
-                        echo "=============================="
+                        echo "=================================="
                         echo "Deploying Application"
-                        echo "=============================="
+                        echo "=================================="
 
-                        echo "Deployment Name:"
-                        echo "${DEPLOYMENT_NAME}"
+                        echo "Environment:"
+                        echo "$ENVIRONMENT"
 
-                        echo "Container Name:"
-                        echo "${CONTAINER_NAME}"
-
+                        echo ""
                         echo "Namespace:"
-                        echo "${NAMESPACE}"
+                        echo "$APP_NAMESPACE"
 
+                        echo ""
+                        echo "Deployment:"
+                        echo "$FRONTEND_DEPLOYMENT"
+
+                        echo ""
+                        echo "Container:"
+                        echo "$FRONTEND_CONTAINER"
+
+                        echo ""
                         echo "Image:"
                         echo "${FULL_ECR_REPO}:${IMAGE_TAG}"
 
-                        echo "=============================="
+                        echo ""
+                        echo "=================================="
 
-                        kubectl set image deployment/${DEPLOYMENT_NAME} \
-                          ${CONTAINER_NAME}=${FULL_ECR_REPO}:${IMAGE_TAG} \
-                          -n ${NAMESPACE}
+                        kubectl set image deployment/${FRONTEND_DEPLOYMENT} \
+                          ${FRONTEND_CONTAINER}=${FULL_ECR_REPO}:${IMAGE_TAG} \
+                          -n ${APP_NAMESPACE}
 
-                        kubectl rollout status deployment/${DEPLOYMENT_NAME} \
-                          -n ${NAMESPACE}
+                        kubectl rollout status deployment/${FRONTEND_DEPLOYMENT} \
+                          -n ${APP_NAMESPACE}
                     '''
                 }
             }
         }
     }
 
+    /*
+    ============================================================
+    POST ACTIONS
+    ============================================================
+    */
+
     post {
 
         success {
+
             echo "✅ Frontend Pipeline Completed Successfully"
         }
 
         failure {
+
             echo "❌ Frontend Pipeline Failed"
         }
     }
 }
+
