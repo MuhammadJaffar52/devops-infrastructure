@@ -19,7 +19,9 @@ IRSA (IAM Roles for Service Accounts)
 AWS Client VPN
 Amazon ECR
 
-This platform provides a fully automated, reusable, secure, and portable Kubernetes-based DevOps infrastructure on AWS for deploying production-ready applications.
+This platform provides a fully automated, reusable, secure, 
+and portable Kubernetes-based DevOps infrastructure
+on AWS for deploying production-ready applications.
 
 Project Goals
 
@@ -519,7 +521,7 @@ Inside Jenkins:
 create GitHub credentials
 configure Kubernetes cloud
 create pipeline jobs
-Step 7 — Run Jenkins Pipeline
+Step 7 — Run Jenkins Pipeline.
 
 The pipeline automatically:
 
