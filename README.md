@@ -2,7 +2,7 @@ DevOps Infrastructure Platform
 
 Enterprise-grade AWS DevOps Infrastructure Platform built using:
 
-Terraform
+Terraform.
 AWS EKS
 Kubernetes
 Helm
