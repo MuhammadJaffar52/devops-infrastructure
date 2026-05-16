@@ -222,20 +222,22 @@ EOF
             }
         }
 
-        stage('Deploy To Kubernetes') {
-            steps {
+       stage('Deploy To Kubernetes') {
+steps {
+container('kubectl') {
 
-                container('kubectl') {
 
-                    sh '''
-                        echo "Deploying application"
+        sh '''
+            echo "Deploying application"
 
-                        kubectl apply -f k8s/frontend/
-                    '''
-                }
-            }
-        }
+            kubectl apply -f k8s/apps/frontend/
+        '''
     }
+}
+
+
+}
+
 
     post {
 
