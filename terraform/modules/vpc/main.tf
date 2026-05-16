@@ -1,149 +1,248 @@
+# =========================================================
+# DATA SOURCES
+# =========================================================
+#
+# Dynamically fetch availability zones.
+#
+# PHASE 5 IMPROVEMENT:
+# Removes hardcoded AZ dependency.
+# =========================================================
+
+data "aws_availability_zones" "available" {}
+
+# =========================================================
+# VPC
+# =========================================================
+
 resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_support   = true
+
+  cidr_block = var.vpc_cidr
+
+  enable_dns_support = true
+
   enable_dns_hostnames = true
 
   tags = {
-    Name = "devops-vpc"
+
+    Name = "${var.environment}-devops-vpc"
   }
 }
 
-# -------------------------
-# Internet Gateway
-# -------------------------
+# =========================================================
+# INTERNET GATEWAY
+# =========================================================
+
 resource "aws_internet_gateway" "igw" {
+
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "devops-igw"
+
+    Name = "${var.environment}-igw"
   }
 }
 
-# -------------------------
-# PUBLIC SUBNETS (ALB + NAT)
-# -------------------------
+# =========================================================
+# PUBLIC SUBNET 1
+# =========================================================
+
 resource "aws_subnet" "public_1" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "eu-west-1a"
+
+  vpc_id = aws_vpc.main.id
+
+  cidr_block = cidrsubnet(var.vpc_cidr, 8, 1)
+
+  availability_zone =
+    data.aws_availability_zones.available.names[0]
+
   map_public_ip_on_launch = true
 
   tags = {
-    Name                        = "public-subnet-1"
-    "kubernetes.io/role/elb"    = "1"
-    "kubernetes.io/cluster/devops-cluster" = "shared"
+
+    Name = "${var.environment}-public-subnet-1"
+
+    "kubernetes.io/role/elb" = "1"
+
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   }
 }
+
+# =========================================================
+# PUBLIC SUBNET 2
+# =========================================================
 
 resource "aws_subnet" "public_2" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "eu-west-1b"
+
+  vpc_id = aws_vpc.main.id
+
+  cidr_block = cidrsubnet(var.vpc_cidr, 8, 2)
+
+  availability_zone =
+    data.aws_availability_zones.available.names[1]
+
   map_public_ip_on_launch = true
 
   tags = {
-    Name                        = "public-subnet-2"
-    "kubernetes.io/role/elb"    = "1"
-    "kubernetes.io/cluster/devops-cluster" = "shared"
+
+    Name = "${var.environment}-public-subnet-2"
+
+    "kubernetes.io/role/elb" = "1"
+
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   }
 }
 
-# -------------------------
-# PRIVATE SUBNETS (EKS NODES)
-# -------------------------
+# =========================================================
+# PRIVATE SUBNET 1
+# =========================================================
+
 resource "aws_subnet" "private_1" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.3.0/24"
-  availability_zone = "eu-west-1a"
+
+  vpc_id = aws_vpc.main.id
+
+  cidr_block = cidrsubnet(var.vpc_cidr, 8, 3)
+
+  availability_zone =
+    data.aws_availability_zones.available.names[0]
 
   tags = {
-    Name                        = "private-subnet-1"
+
+    Name = "${var.environment}-private-subnet-1"
+
     "kubernetes.io/role/internal-elb" = "1"
-    "kubernetes.io/cluster/devops-cluster" = "shared"
+
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   }
 }
+
+# =========================================================
+# PRIVATE SUBNET 2
+# =========================================================
 
 resource "aws_subnet" "private_2" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.4.0/24"
-  availability_zone = "eu-west-1b"
+
+  vpc_id = aws_vpc.main.id
+
+  cidr_block = cidrsubnet(var.vpc_cidr, 8, 4)
+
+  availability_zone =
+    data.aws_availability_zones.available.names[1]
 
   tags = {
-    Name                        = "private-subnet-2"
+
+    Name = "${var.environment}-private-subnet-2"
+
     "kubernetes.io/role/internal-elb" = "1"
-    "kubernetes.io/cluster/devops-cluster" = "shared"
+
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   }
 }
 
-# -------------------------
-# NAT GATEWAY
-# -------------------------
+# =========================================================
+# ELASTIC IP
+# =========================================================
+
 resource "aws_eip" "nat" {
+
   domain = "vpc"
+
+  tags = {
+
+    Name = "${var.environment}-nat-eip"
+  }
 }
+
+# =========================================================
+# NAT GATEWAY
+# =========================================================
 
 resource "aws_nat_gateway" "nat" {
+
   allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public_1.id
+
+  subnet_id = aws_subnet.public_1.id
 
   tags = {
-    Name = "devops-nat"
+
+    Name = "${var.environment}-nat"
   }
 
-  depends_on = [aws_internet_gateway.igw]
+  depends_on = [
+
+    aws_internet_gateway.igw
+  ]
 }
 
-# -------------------------
+# =========================================================
 # PUBLIC ROUTE TABLE
-# -------------------------
+# =========================================================
+
 resource "aws_route_table" "public" {
+
   vpc_id = aws_vpc.main.id
 
   route {
+
     cidr_block = "0.0.0.0/0"
+
     gateway_id = aws_internet_gateway.igw.id
   }
 
   tags = {
-    Name = "public-rt"
+
+    Name = "${var.environment}-public-rt"
   }
 }
 
-# -------------------------
+# =========================================================
 # PRIVATE ROUTE TABLE
-# -------------------------
+# =========================================================
+
 resource "aws_route_table" "private" {
+
   vpc_id = aws_vpc.main.id
 
   route {
-    cidr_block     = "0.0.0.0/0"
+
+    cidr_block = "0.0.0.0/0"
+
     nat_gateway_id = aws_nat_gateway.nat.id
   }
 
   tags = {
-    Name = "private-rt"
+
+    Name = "${var.environment}-private-rt"
   }
 }
 
-# -------------------------
+# =========================================================
 # ROUTE TABLE ASSOCIATIONS
-# -------------------------
+# =========================================================
+
 resource "aws_route_table_association" "public_1" {
-  subnet_id      = aws_subnet.public_1.id
+
+  subnet_id = aws_subnet.public_1.id
+
   route_table_id = aws_route_table.public.id
 }
 
 resource "aws_route_table_association" "public_2" {
-  subnet_id      = aws_subnet.public_2.id
+
+  subnet_id = aws_subnet.public_2.id
+
   route_table_id = aws_route_table.public.id
 }
 
 resource "aws_route_table_association" "private_1" {
-  subnet_id      = aws_subnet.private_1.id
+
+  subnet_id = aws_subnet.private_1.id
+
   route_table_id = aws_route_table.private.id
 }
 
 resource "aws_route_table_association" "private_2" {
-  subnet_id      = aws_subnet.private_2.id
+
+  subnet_id = aws_subnet.private_2.id
+
   route_table_id = aws_route_table.private.id
 }
