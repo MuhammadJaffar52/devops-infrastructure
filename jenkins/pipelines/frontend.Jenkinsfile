@@ -5,18 +5,30 @@ pipeline {
             yaml """
 apiVersion: v1
 kind: Pod
+
 metadata:
   labels:
     app: frontend-pipeline
+
 spec:
   serviceAccountName: jenkins
 
   containers:
+
     - name: trivy
       image: aquasec/trivy:latest
       command:
         - cat
       tty: true
+
+    - name: aws
+      image: amazon/aws-cli:latest
+      command:
+        - cat
+      tty: true
+      envFrom:
+        - secretRef:
+            name: aws-credentials
 
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
@@ -90,10 +102,12 @@ spec:
                     echo appConfig
 
                     appConfig.split("\\n").each { line ->
-                        def parts = line.split("=")
 
-                        if (parts.length == 2) {
-                            env."${parts[0]}" = parts[1]
+                        def parts = line.tokenize("=")
+
+                        if (parts.size() >= 2) {
+
+                            env[parts[0]] = parts[1]
                         }
                     }
 
@@ -102,32 +116,45 @@ spec:
             }
         }
 
-  
-stage('Detect AWS Account ID') {
-    steps {
-        container('kaniko') {
-            script {
+        stage('Detect AWS Account ID') {
+            steps {
 
-                env.AWS_ACCOUNT_ID = sh(
-                    script: '''
-                        aws sts get-caller-identity \
-                        --query Account \
-                        --output text
-                    ''',
-                    returnStdout: true
-                ).trim()
+                container('aws') {
 
-                echo "AWS Account ID: ${env.AWS_ACCOUNT_ID}"
+                    script {
+
+                        env.AWS_ACCOUNT_ID = sh(
+                            script: '''
+                                aws sts get-caller-identity \
+                                --query Account \
+                                --output text
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        echo "AWS Account ID: ${env.AWS_ACCOUNT_ID}"
+                    }
+                }
             }
         }
-    }
-}
 
+        stage('Login To Amazon ECR') {
+            steps {
 
+                container('aws') {
+
+                    sh '''
+                        aws ecr get-login-password --region ${AWS_REGION} > /tmp/ecr-token
+                    '''
+                }
+            }
+        }
 
         stage('Trivy Security Scan') {
             steps {
+
                 container('trivy') {
+
                     sh '''
                         trivy fs .
                     '''
@@ -137,9 +164,20 @@ stage('Detect AWS Account ID') {
 
         stage('Build & Push Image') {
             steps {
+
                 container('kaniko') {
 
                     sh '''
+                        mkdir -p /kaniko/.docker
+
+                        cat > /kaniko/.docker/config.json <<EOF
+{
+  "credHelpers": {
+    "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com": "ecr-login"
+  }
+}
+EOF
+
                         echo "Starting Docker build"
 
                         /kaniko/executor \
@@ -152,8 +190,9 @@ stage('Detect AWS Account ID') {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy To Kubernetes') {
             steps {
+
                 container('kubectl') {
 
                     sh '''
@@ -167,6 +206,7 @@ stage('Detect AWS Account ID') {
     }
 
     post {
+
         always {
             echo 'Pipeline execution finished'
         }
