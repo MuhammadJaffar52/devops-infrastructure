@@ -2,7 +2,6 @@
 pipeline {
 
     agent {
-
         kubernetes {
 
             inheritFrom 'jenkins'
@@ -21,10 +20,8 @@ spec:
 
     - name: trivy
       image: aquasec/trivy:latest
-
       command:
         - cat
-
       tty: true
 
       volumeMounts:
@@ -33,10 +30,8 @@ spec:
 
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
-
       command:
         - cat
-
       tty: true
 
       envFrom:
@@ -49,10 +44,8 @@ spec:
 
     - name: kubectl
       image: bitnami/kubectl:latest
-
       command:
         - cat
-
       tty: true
 
       securityContext:
@@ -83,13 +76,13 @@ spec:
         choice(
             name: 'ENVIRONMENT',
             choices: ['dev', 'staging', 'prod'],
-            description: 'Select Environment'
+            description: 'Select Deployment Environment'
         )
 
         choice(
             name: 'APP_NAME',
             choices: ['frontend', 'backend'],
-            description: 'Select Application'
+            description: 'Application To Deploy'
         )
     }
 
@@ -120,23 +113,20 @@ spec:
 
                 container('kaniko') {
 
-                    sh """
+                    sh '''
+                        #!/bin/bash
                         set -e
 
-                        export ENVIRONMENT=${params.ENVIRONMENT}
+                        export ENVIRONMENT=${ENVIRONMENT}
 
                         chmod +x scripts/load-env.sh
 
-                        . scripts/load-env.sh
+                        bash scripts/load-env.sh
 
                         echo "=================================="
                         echo "Environment Loaded Successfully"
                         echo "=================================="
-
-                        echo "ENVIRONMENT=\$ENVIRONMENT"
-                        echo "AWS_REGION=\$AWS_REGION"
-                        echo "APP_NAMESPACE=\$APP_NAMESPACE"
-                    """
+                    '''
                 }
             }
         }
@@ -147,52 +137,35 @@ spec:
 
                 script {
 
-                    def prefix = params.APP_NAME.toUpperCase()
-
-                    env.APP_ECR_REPO = sh(
+                    def envData = sh(
                         script: """
-                            export ENVIRONMENT=${params.ENVIRONMENT}
-                            . scripts/load-env.sh >/dev/null 2>&1
-                            printenv ${prefix}_ECR_REPO
-                        """,
+#!/bin/bash
+set -e
+
+export ENVIRONMENT=${params.ENVIRONMENT}
+
+source scripts/load-env.sh > /dev/null 2>&1
+
+echo "APP_ECR_REPO=\$APP_ECR_REPO"
+echo "APP_DEPLOYMENT=\$APP_DEPLOYMENT"
+echo "APP_CONTAINER=\$APP_CONTAINER"
+echo "APP_DOCKER_CONTEXT=\$APP_DOCKER_CONTEXT"
+echo "APP_DOCKERFILE=\$APP_DOCKERFILE"
+""",
                         returnStdout: true
                     ).trim()
 
-                    env.APP_DEPLOYMENT = sh(
-                        script: """
-                            export ENVIRONMENT=${params.ENVIRONMENT}
-                            . scripts/load-env.sh >/dev/null 2>&1
-                            printenv ${prefix}_DEPLOYMENT
-                        """,
-                        returnStdout: true
-                    ).trim()
+                    def lines = envData.split("\\n")
 
-                    env.APP_CONTAINER = sh(
-                        script: """
-                            export ENVIRONMENT=${params.ENVIRONMENT}
-                            . scripts/load-env.sh >/dev/null 2>&1
-                            printenv ${prefix}_CONTAINER
-                        """,
-                        returnStdout: true
-                    ).trim()
+                    for (line in lines) {
 
-                    env.APP_DOCKER_CONTEXT = sh(
-                        script: """
-                            export ENVIRONMENT=${params.ENVIRONMENT}
-                            . scripts/load-env.sh >/dev/null 2>&1
-                            printenv ${prefix}_DOCKER_CONTEXT
-                        """,
-                        returnStdout: true
-                    ).trim()
+                        def parts = line.split("=")
 
-                    env.APP_DOCKERFILE = sh(
-                        script: """
-                            export ENVIRONMENT=${params.ENVIRONMENT}
-                            . scripts/load-env.sh >/dev/null 2>&1
-                            printenv ${prefix}_DOCKERFILE
-                        """,
-                        returnStdout: true
-                    ).trim()
+                        if (parts.length == 2) {
+
+                            env[parts[0]] = parts[1]
+                        }
+                    }
 
                     echo "=================================="
                     echo "Application Configuration Loaded"
@@ -220,10 +193,11 @@ spec:
 
                         env.AWS_ACCOUNT_ID = sh(
                             script: '''
-                                aws sts get-caller-identity \
-                                --query Account \
-                                --output text
-                            ''',
+#!/bin/bash
+aws sts get-caller-identity \
+--query Account \
+--output text
+''',
                             returnStdout: true
                         ).trim()
 
@@ -246,23 +220,23 @@ spec:
                 container('trivy') {
 
                     sh '''
-                        set -e
+#!/bin/bash
+set -e
 
-                        echo "=================================="
-                        echo "Running Trivy Security Scan"
-                        echo "=================================="
+echo "=================================="
+echo "Running Trivy Security Scan"
+echo "=================================="
 
-                        trivy fs \
-                          --severity HIGH,CRITICAL \
-                          --scanners vuln \
-                          --exit-code 0 \
-                          .
+trivy fs \
+  --severity HIGH,CRITICAL \
+  --scanners vuln \
+  --exit-code 0 \
+  .
 
-                        echo ""
-                        echo "=================================="
-                        echo "Trivy Scan Completed"
-                        echo "=================================="
-                    '''
+echo ""
+echo "Trivy Scan Completed"
+echo "=================================="
+'''
                 }
             }
         }
@@ -273,43 +247,42 @@ spec:
 
                 container('kaniko') {
 
-                    sh """
-                        set -e
+                    sh '''
+#!/bin/bash
+set -e
 
-                        export ENVIRONMENT=${params.ENVIRONMENT}
+source configs/${ENVIRONMENT}.env
 
-                        . scripts/load-env.sh
+export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}"
 
-                        export FULL_ECR_REPO="\${AWS_ACCOUNT_ID}.dkr.ecr.\${AWS_REGION}.amazonaws.com/${env.APP_ECR_REPO}"
+echo "=================================="
+echo "Using ECR Repository"
+echo "=================================="
 
-                        echo "=================================="
-                        echo "Using ECR Repository"
-                        echo "=================================="
+echo "$FULL_ECR_REPO"
 
-                        echo "\$FULL_ECR_REPO"
-
-                        mkdir -p /kaniko/.docker
+mkdir -p /kaniko/.docker
 
 cat > /kaniko/.docker/config.json <<EOF
 {
   "auths": {
-    "\${AWS_ACCOUNT_ID}.dkr.ecr.\${AWS_REGION}.amazonaws.com": {}
+    "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com": {}
   }
 }
 EOF
 
-                        echo "=================================="
-                        echo "Building & Pushing Docker Image"
-                        echo "=================================="
+echo "=================================="
+echo "Building & Pushing Docker Image"
+echo "=================================="
 
-                        /kaniko/executor \
-                          --context=/home/jenkins/agent/workspace/frontend-pipeline/${env.APP_DOCKER_CONTEXT} \
-                          --dockerfile=/home/jenkins/agent/workspace/frontend-pipeline/${env.APP_DOCKERFILE} \
-                          --destination=\${FULL_ECR_REPO}:${IMAGE_TAG} \
-                          --destination=\${FULL_ECR_REPO}:latest \
-                          --cache=true \
-                          --verbosity=info
-                    """
+/kaniko/executor \
+  --context=/home/jenkins/agent/workspace/frontend-pipeline/${APP_DOCKER_CONTEXT} \
+  --dockerfile=/home/jenkins/agent/workspace/frontend-pipeline/${APP_DOCKERFILE} \
+  --destination=${FULL_ECR_REPO}:${IMAGE_TAG} \
+  --destination=${FULL_ECR_REPO}:latest \
+  --cache=true \
+  --verbosity=info
+'''
                 }
             }
         }
@@ -322,39 +295,38 @@ EOF
 
                     timeout(time: 10, unit: 'MINUTES') {
 
-                        sh """
-                            set -e
+                        sh '''
+#!/bin/bash
+set -e
 
-                            export ENVIRONMENT=${params.ENVIRONMENT}
+source configs/${ENVIRONMENT}.env
 
-                            . scripts/load-env.sh
+export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}"
 
-                            export FULL_ECR_REPO="\${AWS_ACCOUNT_ID}.dkr.ecr.\${AWS_REGION}.amazonaws.com/${env.APP_ECR_REPO}"
+echo "=================================="
+echo "Deploying Application"
+echo "=================================="
 
-                            echo "=================================="
-                            echo "Deploying Application"
-                            echo "=================================="
+echo "Environment: $ENVIRONMENT"
+echo "Application: ${APP_NAME}"
 
-                            echo "Environment: \$ENVIRONMENT"
-                            echo "Application: ${params.APP_NAME}"
+echo "Namespace: $APP_NAMESPACE"
 
-                            echo "Namespace: \$APP_NAMESPACE"
+echo "Deployment: ${APP_DEPLOYMENT}"
 
-                            echo "Deployment: ${env.APP_DEPLOYMENT}"
+echo "Container: ${APP_CONTAINER}"
 
-                            echo "Container: ${env.APP_CONTAINER}"
+echo "Image: ${FULL_ECR_REPO}:${IMAGE_TAG}"
 
-                            echo "Image: \${FULL_ECR_REPO}:${IMAGE_TAG}"
+echo "=================================="
 
-                            echo "=================================="
+kubectl set image deployment/${APP_DEPLOYMENT} \
+  ${APP_CONTAINER}=${FULL_ECR_REPO}:${IMAGE_TAG} \
+  -n ${APP_NAMESPACE}
 
-                            kubectl set image deployment/${env.APP_DEPLOYMENT} \
-                              ${env.APP_CONTAINER}=\${FULL_ECR_REPO}:${IMAGE_TAG} \
-                              -n \$APP_NAMESPACE
-
-                            kubectl rollout status deployment/${env.APP_DEPLOYMENT} \
-                              -n \$APP_NAMESPACE
-                        """
+kubectl rollout status deployment/${APP_DEPLOYMENT} \
+  -n ${APP_NAMESPACE}
+'''
                     }
                 }
             }
