@@ -1,7 +1,9 @@
 
 pipeline {
+
     agent {
         kubernetes {
+
             yaml """
 apiVersion: v1
 kind: Pod
@@ -66,11 +68,14 @@ spec:
 
         stage('Load Environment Config') {
             steps {
+
                 container('kubectl') {
+
                     sh '''
                         set -e
 
                         chmod +x scripts/load-env.sh
+
                         sh scripts/load-env.sh
 
                         echo "Environment configuration loaded"
@@ -81,37 +86,64 @@ spec:
 
         stage('Load Application Config') {
             steps {
-                script {
 
-                    def appConfig = sh(
-                        script: '''
-                            set -e
+                container('kubectl') {
 
-                            export ENVIRONMENT=dev
-                            . scripts/load-env.sh >/dev/null 2>&1
+                    script {
 
-                            echo "APP_ECR_REPO=$APP_ECR_REPO"
-                            echo "APP_DEPLOYMENT=$APP_DEPLOYMENT"
-                            echo "APP_CONTAINER=$APP_CONTAINER"
-                            echo "APP_DOCKER_CONTEXT=$APP_DOCKER_CONTEXT"
-                            echo "APP_DOCKERFILE=$APP_DOCKERFILE"
-                        ''',
-                        returnStdout: true
-                    ).trim()
+                        env.APP_ECR_REPO = sh(
+                            script: '''
+                                export ENVIRONMENT=dev
+                                . scripts/load-env.sh >/dev/null 2>&1
+                                echo -n $APP_ECR_REPO
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
-                    echo appConfig
+                        env.APP_DEPLOYMENT = sh(
+                            script: '''
+                                export ENVIRONMENT=dev
+                                . scripts/load-env.sh >/dev/null 2>&1
+                                echo -n $APP_DEPLOYMENT
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
-                    appConfig.split("\\n").each { line ->
+                        env.APP_CONTAINER = sh(
+                            script: '''
+                                export ENVIRONMENT=dev
+                                . scripts/load-env.sh >/dev/null 2>&1
+                                echo -n $APP_CONTAINER
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
-                        def parts = line.tokenize("=")
+                        env.APP_DOCKER_CONTEXT = sh(
+                            script: '''
+                                export ENVIRONMENT=dev
+                                . scripts/load-env.sh >/dev/null 2>&1
+                                echo -n $APP_DOCKER_CONTEXT
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
-                        if (parts.size() >= 2) {
+                        env.APP_DOCKERFILE = sh(
+                            script: '''
+                                export ENVIRONMENT=dev
+                                . scripts/load-env.sh >/dev/null 2>&1
+                                echo -n $APP_DOCKERFILE
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
-                            env[parts[0]] = parts[1]
-                        }
+                        echo "APP_ECR_REPO=${env.APP_ECR_REPO}"
+                        echo "APP_DEPLOYMENT=${env.APP_DEPLOYMENT}"
+                        echo "APP_CONTAINER=${env.APP_CONTAINER}"
+                        echo "APP_DOCKER_CONTEXT=${env.APP_DOCKER_CONTEXT}"
+                        echo "APP_DOCKERFILE=${env.APP_DOCKERFILE}"
+
+                        echo "Application configuration loaded successfully"
                     }
-
-                    echo "Application configuration loaded successfully"
                 }
             }
         }
@@ -138,13 +170,15 @@ spec:
             }
         }
 
-        stage('Login To Amazon ECR') {
+        stage('Verify ECR Repository') {
             steps {
 
                 container('aws') {
 
                     sh '''
-                        aws ecr get-login-password --region ${AWS_REGION} > /tmp/ecr-token
+                        aws ecr describe-repositories \
+                        --repository-names ${APP_ECR_REPO} \
+                        --region ${AWS_REGION}
                     '''
                 }
             }
@@ -168,17 +202,15 @@ spec:
                 container('kaniko') {
 
                     sh '''
+                        echo "Starting Docker build"
+
                         mkdir -p /kaniko/.docker
 
                         cat > /kaniko/.docker/config.json <<EOF
 {
-  "credHelpers": {
-    "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com": "ecr-login"
-  }
+  "credsStore": "ecr-login"
 }
 EOF
-
-                        echo "Starting Docker build"
 
                         /kaniko/executor \
                           --context=${WORKSPACE}/${APP_DOCKER_CONTEXT} \
