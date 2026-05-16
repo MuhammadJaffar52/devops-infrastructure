@@ -1,20 +1,33 @@
-   groovy
 pipeline {
 
-    agent {
-        kubernetes {
-            inheritFrom 'jenkins'
+    /*
+    ============================================================
+    GLOBAL PIPELINE OPTIONS
+    ============================================================
+    */
 
-            /*
-            ============================================================
-            PHASE 2 IMPROVEMENT
-            ------------------------------------------------------------
-            AWS REGION NOW COMES FROM:
-            configs/dev.env
-            configs/staging.env
-            configs/prod.env
-            ============================================================
-            */
+    options {
+
+        buildDiscarder(
+            logRotator(
+                numToKeepStr: '20'
+            )
+        )
+
+        timestamps()
+    }
+
+    /*
+    ============================================================
+    KUBERNETES AGENT
+    ============================================================
+    */
+
+    agent {
+
+        kubernetes {
+
+            inheritFrom 'jenkins'
 
             yaml """
 apiVersion: v1
@@ -30,8 +43,10 @@ spec:
 
     - name: trivy
       image: aquasec/trivy:latest
+
       command:
         - cat
+
       tty: true
 
       volumeMounts:
@@ -78,12 +93,17 @@ spec:
 
     /*
     ============================================================
-    PHASE 2 IMPROVEMENT
+    PIPELINE PARAMETERS
     ------------------------------------------------------------
-    ONLY ENVIRONMENT SELECTION REMAINS
+    ENVIRONMENT:
+    - dev
+    - staging
+    - prod
 
-    Everything else loads automatically from:
-    configs/<environment>.env
+    APP_NAME:
+    - frontend
+    - backend
+    - future apps
     ============================================================
     */
 
@@ -94,15 +114,21 @@ spec:
             choices: ['dev', 'staging', 'prod'],
             description: 'Select Deployment Environment'
         )
+
+        choice(
+            name: 'APP_NAME',
+            choices: ['frontend', 'backend'],
+            description: 'Application To Deploy'
+        )
     }
 
-    environment {
+    /*
+    ============================================================
+    GLOBAL ENVIRONMENT VARIABLES
+    ============================================================
+    */
 
-        /*
-        ============================================================
-        BUILD NUMBER
-        ============================================================
-        */
+    environment {
 
         IMAGE_TAG = "${BUILD_NUMBER}"
     }
@@ -111,24 +137,27 @@ spec:
 
         /*
         ============================================================
-        CHECKOUT
+        CHECKOUT SOURCE CODE
         ============================================================
         */
 
         stage('Checkout') {
+
             steps {
+
+                script {
+
+                    currentBuild.displayName =
+                        "#${BUILD_NUMBER} - ${params.ENVIRONMENT} - ${params.APP_NAME}"
+                }
+
                 checkout scm
             }
         }
 
         /*
         ============================================================
-        LOAD CENTRALIZED CONFIGURATION
-        ------------------------------------------------------------
-        Loads:
-        configs/dev.env
-        configs/staging.env
-        configs/prod.env
+        LOAD ENVIRONMENT CONFIG
         ============================================================
         */
 
@@ -149,14 +178,107 @@ spec:
 
                         chmod +x scripts/load-env.sh
 
-                        source scripts/load-env.sh
+                        . scripts/load-env.sh
 
                         echo ""
-                        echo "Loaded Environment Variables:"
+                        echo "Environment Loaded Successfully"
                         echo ""
-
-                        env | grep -E 'AWS_REGION|FRONTEND|APP_NAMESPACE'
                     '''
+                }
+            }
+        }
+
+        /*
+        ============================================================
+        DYNAMIC APPLICATION CONFIGURATION
+        ------------------------------------------------------------
+        THIS IS THE MOST IMPORTANT PHASE 4 CHANGE
+        ------------------------------------------------------------
+
+        Dynamically builds:
+        - ECR repo
+        - deployment
+        - container
+        - docker context
+        - dockerfile
+
+        based on APP_NAME parameter.
+
+        SAME PIPELINE NOW WORKS FOR:
+        - frontend
+        - backend
+        - future services
+        ============================================================
+        */
+
+        stage('Load Application Config') {
+
+            steps {
+
+                script {
+
+                    env.APP_ECR_REPO =
+                        sh(
+                            script: """
+                                . scripts/load-env.sh >/dev/null 2>&1
+
+                                eval echo \\$${params.APP_NAME.toUpperCase()}_ECR_REPO
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                    env.APP_DEPLOYMENT =
+                        sh(
+                            script: """
+                                . scripts/load-env.sh >/dev/null 2>&1
+
+                                eval echo \\$${params.APP_NAME.toUpperCase()}_DEPLOYMENT
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                    env.APP_CONTAINER =
+                        sh(
+                            script: """
+                                . scripts/load-env.sh >/dev/null 2>&1
+
+                                eval echo \\$${params.APP_NAME.toUpperCase()}_CONTAINER
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                    env.APP_DOCKER_CONTEXT =
+                        sh(
+                            script: """
+                                . scripts/load-env.sh >/dev/null 2>&1
+
+                                eval echo \\$${params.APP_NAME.toUpperCase()}_DOCKER_CONTEXT
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                    env.APP_DOCKERFILE =
+                        sh(
+                            script: """
+                                . scripts/load-env.sh >/dev/null 2>&1
+
+                                eval echo \\$${params.APP_NAME.toUpperCase()}_DOCKERFILE
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                    echo "=================================="
+                    echo "Application Configuration Loaded"
+                    echo "=================================="
+
+                    echo "APP_NAME: ${params.APP_NAME}"
+                    echo "APP_ECR_REPO: ${env.APP_ECR_REPO}"
+                    echo "APP_DEPLOYMENT: ${env.APP_DEPLOYMENT}"
+                    echo "APP_CONTAINER: ${env.APP_CONTAINER}"
+                    echo "APP_DOCKER_CONTEXT: ${env.APP_DOCKER_CONTEXT}"
+                    echo "APP_DOCKERFILE: ${env.APP_DOCKERFILE}"
+
+                    echo "=================================="
                 }
             }
         }
@@ -173,30 +295,25 @@ spec:
 
                 container('kaniko') {
 
-                    sh '''
-                        set -e
+                    script {
 
-                        source scripts/load-env.sh
+                        env.AWS_ACCOUNT_ID = sh(
+                            script: '''
+                                aws sts get-caller-identity \
+                                --query Account \
+                                --output text
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
                         echo "=================================="
-                        echo "Detecting AWS Account ID"
+                        echo "Detected AWS Account ID"
                         echo "=================================="
 
-                        export AWS_ACCOUNT_ID=$(aws sts get-caller-identity \
-                          --query Account \
-                          --output text)
+                        echo "${env.AWS_ACCOUNT_ID}"
 
-                        echo ""
-                        echo "Detected AWS Account ID:"
-                        echo "$AWS_ACCOUNT_ID"
-
-                        echo ""
                         echo "=================================="
-
-                        cat > account.env <<EOF
-AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID
-EOF
-                    '''
+                    }
                 }
             }
         }
@@ -214,6 +331,8 @@ EOF
                 container('trivy') {
 
                     sh '''
+                        set -e
+
                         echo "=================================="
                         echo "Running Trivy Security Scan"
                         echo "=================================="
@@ -225,7 +344,6 @@ EOF
                           .
 
                         echo ""
-                        echo "=================================="
                         echo "Trivy Scan Completed"
                         echo "=================================="
                     '''
@@ -248,19 +366,15 @@ EOF
                     sh '''
                         set -e
 
-                        source scripts/load-env.sh
-                        source account.env
+                        . scripts/load-env.sh
 
-                        export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_ECR_REPO}"
+                        export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}"
 
                         echo "=================================="
                         echo "Using ECR Repository"
                         echo "=================================="
 
                         echo "$FULL_ECR_REPO"
-
-                        echo ""
-                        echo "=================================="
 
                         mkdir -p /kaniko/.docker
 
@@ -277,8 +391,8 @@ EOF
                         echo "=================================="
 
                         /kaniko/executor \
-                          --context=/home/jenkins/agent/workspace/frontend-pipeline/${FRONTEND_DOCKER_CONTEXT} \
-                          --dockerfile=/home/jenkins/agent/workspace/frontend-pipeline/${FRONTEND_DOCKERFILE} \
+                          --context=/home/jenkins/agent/workspace/frontend-pipeline/${APP_DOCKER_CONTEXT} \
+                          --dockerfile=/home/jenkins/agent/workspace/frontend-pipeline/${APP_DOCKERFILE} \
                           --destination=${FULL_ECR_REPO}:${IMAGE_TAG} \
                           --destination=${FULL_ECR_REPO}:latest \
                           --cache=true \
@@ -300,47 +414,40 @@ EOF
 
                 container('kubectl') {
 
-                    sh '''
-                        set -e
+                    timeout(time: 10, unit: 'MINUTES') {
 
-                        source scripts/load-env.sh
-                        source account.env
+                        sh '''
+                            set -e
 
-                        export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_ECR_REPO}"
+                            . scripts/load-env.sh
 
-                        echo "=================================="
-                        echo "Deploying Application"
-                        echo "=================================="
+                            export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}"
 
-                        echo "Environment:"
-                        echo "$ENVIRONMENT"
+                            echo "=================================="
+                            echo "Deploying Application"
+                            echo "=================================="
 
-                        echo ""
-                        echo "Namespace:"
-                        echo "$APP_NAMESPACE"
+                            echo "Environment: $ENVIRONMENT"
+                            echo "Application: ${APP_NAME}"
 
-                        echo ""
-                        echo "Deployment:"
-                        echo "$FRONTEND_DEPLOYMENT"
+                            echo "Namespace: $APP_NAMESPACE"
 
-                        echo ""
-                        echo "Container:"
-                        echo "$FRONTEND_CONTAINER"
+                            echo "Deployment: ${APP_DEPLOYMENT}"
 
-                        echo ""
-                        echo "Image:"
-                        echo "${FULL_ECR_REPO}:${IMAGE_TAG}"
+                            echo "Container: ${APP_CONTAINER}"
 
-                        echo ""
-                        echo "=================================="
+                            echo "Image: ${FULL_ECR_REPO}:${IMAGE_TAG}"
 
-                        kubectl set image deployment/${FRONTEND_DEPLOYMENT} \
-                          ${FRONTEND_CONTAINER}=${FULL_ECR_REPO}:${IMAGE_TAG} \
-                          -n ${APP_NAMESPACE}
+                            echo "=================================="
 
-                        kubectl rollout status deployment/${FRONTEND_DEPLOYMENT} \
-                          -n ${APP_NAMESPACE}
-                    '''
+                            kubectl set image deployment/${APP_DEPLOYMENT} \
+                              ${APP_CONTAINER}=${FULL_ECR_REPO}:${IMAGE_TAG} \
+                              -n ${APP_NAMESPACE}
+
+                            kubectl rollout status deployment/${APP_DEPLOYMENT} \
+                              -n ${APP_NAMESPACE}
+                        '''
+                    }
                 }
             }
         }
@@ -356,13 +463,19 @@ EOF
 
         success {
 
-            echo "✅ Frontend Pipeline Completed Successfully"
+            echo "✅ Pipeline Completed Successfully"
         }
 
         failure {
 
-            echo "❌ Frontend Pipeline Failed"
+            echo "❌ Pipeline Failed"
+        }
+
+        always {
+
+            echo "=================================="
+            echo "Pipeline Execution Finished"
+            echo "=================================="
         }
     }
 }
-
