@@ -114,14 +114,13 @@ spec:
                 container('kaniko') {
 
                     sh '''
-                        #!/bin/bash
                         set -e
 
                         export ENVIRONMENT=${ENVIRONMENT}
 
                         chmod +x scripts/load-env.sh
 
-                        bash scripts/load-env.sh
+                        sh scripts/load-env.sh
 
                         echo "=================================="
                         echo "Environment Loaded Successfully"
@@ -135,50 +134,50 @@ spec:
 
             steps {
 
-                script {
+                container('kaniko') {
 
-                    def envData = sh(
-                        script: """
-#!/bin/bash
+                    script {
+
+                        def envData = sh(
+                            script: '''
 set -e
 
-export ENVIRONMENT=${params.ENVIRONMENT}
+export ENVIRONMENT=''' + params.ENVIRONMENT + '''
 
-source scripts/load-env.sh > /dev/null 2>&1
+. scripts/load-env.sh >/dev/null 2>&1
 
-echo "APP_ECR_REPO=\$APP_ECR_REPO"
-echo "APP_DEPLOYMENT=\$APP_DEPLOYMENT"
-echo "APP_CONTAINER=\$APP_CONTAINER"
-echo "APP_DOCKER_CONTEXT=\$APP_DOCKER_CONTEXT"
-echo "APP_DOCKERFILE=\$APP_DOCKERFILE"
-""",
-                        returnStdout: true
-                    ).trim()
+echo "APP_ECR_REPO=$APP_ECR_REPO"
+echo "APP_DEPLOYMENT=$APP_DEPLOYMENT"
+echo "APP_CONTAINER=$APP_CONTAINER"
+echo "APP_DOCKER_CONTEXT=$APP_DOCKER_CONTEXT"
+echo "APP_DOCKERFILE=$APP_DOCKERFILE"
+''',
+                            returnStdout: true
+                        ).trim()
 
-                    def lines = envData.split("\\n")
+                        envData.split("\\n").each { line ->
 
-                    for (line in lines) {
+                            def parts = line.tokenize("=")
 
-                        def parts = line.split("=")
+                            if (parts.size() >= 2) {
 
-                        if (parts.length == 2) {
-
-                            env[parts[0]] = parts[1]
+                                env[parts[0]] = parts[1]
+                            }
                         }
+
+                        echo "=================================="
+                        echo "Application Configuration Loaded"
+                        echo "=================================="
+
+                        echo "APP_NAME: ${params.APP_NAME}"
+                        echo "APP_ECR_REPO: ${env.APP_ECR_REPO}"
+                        echo "APP_DEPLOYMENT: ${env.APP_DEPLOYMENT}"
+                        echo "APP_CONTAINER: ${env.APP_CONTAINER}"
+                        echo "APP_DOCKER_CONTEXT: ${env.APP_DOCKER_CONTEXT}"
+                        echo "APP_DOCKERFILE: ${env.APP_DOCKERFILE}"
+
+                        echo "=================================="
                     }
-
-                    echo "=================================="
-                    echo "Application Configuration Loaded"
-                    echo "=================================="
-
-                    echo "APP_NAME: ${params.APP_NAME}"
-                    echo "APP_ECR_REPO: ${env.APP_ECR_REPO}"
-                    echo "APP_DEPLOYMENT: ${env.APP_DEPLOYMENT}"
-                    echo "APP_CONTAINER: ${env.APP_CONTAINER}"
-                    echo "APP_DOCKER_CONTEXT: ${env.APP_DOCKER_CONTEXT}"
-                    echo "APP_DOCKERFILE: ${env.APP_DOCKERFILE}"
-
-                    echo "=================================="
                 }
             }
         }
@@ -193,7 +192,6 @@ echo "APP_DOCKERFILE=\$APP_DOCKERFILE"
 
                         env.AWS_ACCOUNT_ID = sh(
                             script: '''
-#!/bin/bash
 aws sts get-caller-identity \
 --query Account \
 --output text
@@ -220,7 +218,6 @@ aws sts get-caller-identity \
                 container('trivy') {
 
                     sh '''
-#!/bin/bash
 set -e
 
 echo "=================================="
@@ -248,10 +245,9 @@ echo "=================================="
                 container('kaniko') {
 
                     sh '''
-#!/bin/bash
 set -e
 
-source configs/${ENVIRONMENT}.env
+. configs/${ENVIRONMENT}.env
 
 export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}"
 
@@ -296,10 +292,9 @@ echo "=================================="
                     timeout(time: 10, unit: 'MINUTES') {
 
                         sh '''
-#!/bin/bash
 set -e
 
-source configs/${ENVIRONMENT}.env
+. configs/${ENVIRONMENT}.env
 
 export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}"
 
@@ -307,25 +302,12 @@ echo "=================================="
 echo "Deploying Application"
 echo "=================================="
 
-echo "Environment: $ENVIRONMENT"
-echo "Application: ${APP_NAME}"
-
-echo "Namespace: $APP_NAMESPACE"
-
-echo "Deployment: ${APP_DEPLOYMENT}"
-
-echo "Container: ${APP_CONTAINER}"
-
-echo "Image: ${FULL_ECR_REPO}:${IMAGE_TAG}"
-
-echo "=================================="
-
 kubectl set image deployment/${APP_DEPLOYMENT} \
-  ${APP_CONTAINER}=${FULL_ECR_REPO}:${IMAGE_TAG} \
-  -n ${APP_NAMESPACE}
+${APP_CONTAINER}=${FULL_ECR_REPO}:${IMAGE_TAG} \
+-n ${APP_NAMESPACE}
 
 kubectl rollout status deployment/${APP_DEPLOYMENT} \
-  -n ${APP_NAMESPACE}
+-n ${APP_NAMESPACE}
 '''
                     }
                 }
