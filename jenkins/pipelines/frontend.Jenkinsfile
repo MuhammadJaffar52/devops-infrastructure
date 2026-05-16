@@ -102,23 +102,28 @@ spec:
             }
         }
 
-        stage('Detect AWS Account ID') {
-            steps {
-                container('kaniko') {
-                    script {
+  
+stage('Detect AWS Account ID') {
+    steps {
+        container('kaniko') {
+            script {
 
-                        env.AWS_ACCOUNT_ID = sh(
-                            script: '''
-                                echo 123456789012
-                            ''',
-                            returnStdout: true
-                        ).trim()
+                env.AWS_ACCOUNT_ID = sh(
+                    script: '''
+                        aws sts get-caller-identity \
+                        --query Account \
+                        --output text
+                    ''',
+                    returnStdout: true
+                ).trim()
 
-                        echo "AWS Account ID: ${env.AWS_ACCOUNT_ID}"
-                    }
-                }
+                echo "AWS Account ID: ${env.AWS_ACCOUNT_ID}"
             }
         }
+    }
+}
+
+
 
         stage('Trivy Security Scan') {
             steps {
