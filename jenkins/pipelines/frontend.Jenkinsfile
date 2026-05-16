@@ -1,16 +1,5 @@
 pipeline {
 
-    options {
-
-        buildDiscarder(
-            logRotator(
-                numToKeepStr: '20'
-            )
-        )
-
-        timestamps()
-    }
-
     agent {
 
         kubernetes {
@@ -41,8 +30,10 @@ spec:
 
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
+
       command:
         - cat
+
       tty: true
 
       envFrom:
@@ -55,8 +46,10 @@ spec:
 
     - name: kubectl
       image: bitnami/kubectl:latest
+
       command:
         - cat
+
       tty: true
 
       securityContext:
@@ -73,18 +66,27 @@ spec:
         }
     }
 
+    options {
+
+        buildDiscarder(
+            logRotator(
+                numToKeepStr: '20'
+            )
+        )
+    }
+
     parameters {
 
         choice(
             name: 'ENVIRONMENT',
             choices: ['dev', 'staging', 'prod'],
-            description: 'Select Deployment Environment'
+            description: 'Select Environment'
         )
 
         choice(
             name: 'APP_NAME',
             choices: ['frontend', 'backend'],
-            description: 'Application To Deploy'
+            description: 'Select Application'
         )
     }
 
@@ -124,7 +126,7 @@ spec:
 
                         . scripts/load-env.sh
 
-                        echo "Environment Loaded"
+                        echo "Environment loaded successfully"
                     '''
                 }
             }
@@ -136,12 +138,12 @@ spec:
 
                 script {
 
-                    def app = params.APP_NAME.toUpperCase()
+                    def prefix = params.APP_NAME.toUpperCase()
 
                     env.APP_ECR_REPO = sh(
                         script: """
                             . scripts/load-env.sh >/dev/null 2>&1
-                            eval echo \\\$${app}_ECR_REPO
+                            printenv ${prefix}_ECR_REPO
                         """,
                         returnStdout: true
                     ).trim()
@@ -149,7 +151,7 @@ spec:
                     env.APP_DEPLOYMENT = sh(
                         script: """
                             . scripts/load-env.sh >/dev/null 2>&1
-                            eval echo \\\$${app}_DEPLOYMENT
+                            printenv ${prefix}_DEPLOYMENT
                         """,
                         returnStdout: true
                     ).trim()
@@ -157,7 +159,7 @@ spec:
                     env.APP_CONTAINER = sh(
                         script: """
                             . scripts/load-env.sh >/dev/null 2>&1
-                            eval echo \\\$${app}_CONTAINER
+                            printenv ${prefix}_CONTAINER
                         """,
                         returnStdout: true
                     ).trim()
@@ -165,7 +167,7 @@ spec:
                     env.APP_DOCKER_CONTEXT = sh(
                         script: """
                             . scripts/load-env.sh >/dev/null 2>&1
-                            eval echo \\\$${app}_DOCKER_CONTEXT
+                            printenv ${prefix}_DOCKER_CONTEXT
                         """,
                         returnStdout: true
                     ).trim()
@@ -173,7 +175,7 @@ spec:
                     env.APP_DOCKERFILE = sh(
                         script: """
                             . scripts/load-env.sh >/dev/null 2>&1
-                            eval echo \\\$${app}_DOCKERFILE
+                            printenv ${prefix}_DOCKERFILE
                         """,
                         returnStdout: true
                     ).trim()
@@ -207,7 +209,7 @@ spec:
                             returnStdout: true
                         ).trim()
 
-                        echo "AWS ACCOUNT ID: ${env.AWS_ACCOUNT_ID}"
+                        echo "AWS Account ID: ${env.AWS_ACCOUNT_ID}"
                     }
                 }
             }
@@ -221,6 +223,8 @@ spec:
 
                     sh '''
                         set -e
+
+                        echo "Running Trivy Scan"
 
                         trivy fs \
                           --severity HIGH,CRITICAL \
@@ -245,9 +249,12 @@ spec:
 
                         export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}"
 
+                        echo "Using Repo:"
+                        echo "$FULL_ECR_REPO"
+
                         mkdir -p /kaniko/.docker
 
-                        cat > /kaniko/.docker/config.json <<EOF
+cat > /kaniko/.docker/config.json <<EOF
 {
   "auths": {
     "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com": {}
@@ -282,6 +289,8 @@ EOF
 
                             export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}"
 
+                            echo "Deploying ${APP_NAME}"
+
                             kubectl set image deployment/${APP_DEPLOYMENT} \
                               ${APP_CONTAINER}=${FULL_ECR_REPO}:${IMAGE_TAG} \
                               -n ${APP_NAMESPACE}
@@ -299,17 +308,17 @@ EOF
 
         success {
 
-            echo "Pipeline Completed Successfully"
+            echo "Pipeline completed successfully"
         }
 
         failure {
 
-            echo "Pipeline Failed"
+            echo "Pipeline failed"
         }
 
         always {
 
-            echo "Pipeline Execution Finished"
+            echo "Pipeline execution finished"
         }
     }
 }
