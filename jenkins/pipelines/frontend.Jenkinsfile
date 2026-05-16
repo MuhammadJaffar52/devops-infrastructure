@@ -1,481 +1,60 @@
-pipeline {
-
-    /*
-    ============================================================
-    GLOBAL PIPELINE OPTIONS
-    ============================================================
-    */
-
-    options {
-
-        buildDiscarder(
-            logRotator(
-                numToKeepStr: '20'
-            )
-        )
-
-        timestamps()
-    }
-
-    /*
-    ============================================================
-    KUBERNETES AGENT
-    ============================================================
-    */
-
-    agent {
-
-        kubernetes {
-
-            inheritFrom 'jenkins'
-
-            yaml """
-apiVersion: v1
-kind: Pod
-
-metadata:
-  namespace: jenkins
-
-spec:
-  serviceAccountName: jenkins
-
-  containers:
-
-    - name: trivy
-      image: aquasec/trivy:latest
-
-      command:
-        - cat
-
-      tty: true
-
-      volumeMounts:
-        - mountPath: /home/jenkins/agent
-          name: workspace-volume
-
-    - name: kaniko
-      image: gcr.io/kaniko-project/executor:debug
-
-      command:
-        - cat
-
-      tty: true
-
-      envFrom:
-        - secretRef:
-            name: aws-credentials
-
-      volumeMounts:
-        - mountPath: /home/jenkins/agent
-          name: workspace-volume
-
-    - name: kubectl
-      image: bitnami/kubectl:latest
-
-      command:
-        - cat
-
-      tty: true
-
-      securityContext:
-        runAsUser: 0
-
-      volumeMounts:
-        - mountPath: /home/jenkins/agent
-          name: workspace-volume
-
-  volumes:
-    - name: workspace-volume
-      emptyDir: {}
-"""
-        }
-    }
-
-    /*
-    ============================================================
-    PIPELINE PARAMETERS
-    ------------------------------------------------------------
-    ENVIRONMENT:
-    - dev
-    - staging
-    - prod
-
-    APP_NAME:
-    - frontend
-    - backend
-    - future apps
-    ============================================================
-    */
-
-    parameters {
-
-        choice(
-            name: 'ENVIRONMENT',
-            choices: ['dev', 'staging', 'prod'],
-            description: 'Select Deployment Environment'
-        )
-
-        choice(
-            name: 'APP_NAME',
-            choices: ['frontend', 'backend'],
-            description: 'Application To Deploy'
-        )
-    }
-
-    /*
-    ============================================================
-    GLOBAL ENVIRONMENT VARIABLES
-    ============================================================
-    */
-
-    environment {
-
-        IMAGE_TAG = "${BUILD_NUMBER}"
-    }
-
-    stages {
-
-        /*
-        ============================================================
-        CHECKOUT SOURCE CODE
-        ============================================================
-        */
-
-        stage('Checkout') {
-
-            steps {
-
-                script {
-
-                    currentBuild.displayName =
-                        "#${BUILD_NUMBER} - ${params.ENVIRONMENT} - ${params.APP_NAME}"
-                }
-
-                checkout scm
-            }
-        }
-
-        /*
-        ============================================================
-        LOAD ENVIRONMENT CONFIG
-        ============================================================
-        */
-
-        stage('Load Environment Config') {
-
-            steps {
-
-                container('kaniko') {
-
-                    sh '''
-                        set -e
-
-                        echo "=================================="
-                        echo "Loading Environment Configuration"
-                        echo "=================================="
-
-                        export ENVIRONMENT=${ENVIRONMENT}
-
-                        chmod +x scripts/load-env.sh
-
-                        . scripts/load-env.sh
-
-                        echo ""
-                        echo "Environment Loaded Successfully"
-                        echo ""
-                    '''
-                }
-            }
-        }
-
-        /*
-        ============================================================
-        DYNAMIC APPLICATION CONFIGURATION
-        ------------------------------------------------------------
-        THIS IS THE MOST IMPORTANT PHASE 4 CHANGE
-        ------------------------------------------------------------
-
-        Dynamically builds:
-        - ECR repo
-        - deployment
-        - container
-        - docker context
-        - dockerfile
-
-        based on APP_NAME parameter.
-
-        SAME PIPELINE NOW WORKS FOR:
-        - frontend
-        - backend
-        - future services
-        ============================================================
-        */
-
-        stage('Load Application Config') {
-
-            steps {
-
-                script {
-
-                    env.APP_ECR_REPO =
-                        sh(
-                            script: """
-                                . scripts/load-env.sh >/dev/null 2>&1
-
-                                eval echo \\$${params.APP_NAME.toUpperCase()}_ECR_REPO
-                            """,
-                            returnStdout: true
-                        ).trim()
-
-                    env.APP_DEPLOYMENT =
-                        sh(
-                            script: """
-                                . scripts/load-env.sh >/dev/null 2>&1
-
-                                eval echo \\$${params.APP_NAME.toUpperCase()}_DEPLOYMENT
-                            """,
-                            returnStdout: true
-                        ).trim()
-
-                    env.APP_CONTAINER =
-                        sh(
-                            script: """
-                                . scripts/load-env.sh >/dev/null 2>&1
-
-                                eval echo \\$${params.APP_NAME.toUpperCase()}_CONTAINER
-                            """,
-                            returnStdout: true
-                        ).trim()
-
-                    env.APP_DOCKER_CONTEXT =
-                        sh(
-                            script: """
-                                . scripts/load-env.sh >/dev/null 2>&1
-
-                                eval echo \\$${params.APP_NAME.toUpperCase()}_DOCKER_CONTEXT
-                            """,
-                            returnStdout: true
-                        ).trim()
-
-                    env.APP_DOCKERFILE =
-                        sh(
-                            script: """
-                                . scripts/load-env.sh >/dev/null 2>&1
-
-                                eval echo \\$${params.APP_NAME.toUpperCase()}_DOCKERFILE
-                            """,
-                            returnStdout: true
-                        ).trim()
-
-                    echo "=================================="
-                    echo "Application Configuration Loaded"
-                    echo "=================================="
-
-                    echo "APP_NAME: ${params.APP_NAME}"
-                    echo "APP_ECR_REPO: ${env.APP_ECR_REPO}"
-                    echo "APP_DEPLOYMENT: ${env.APP_DEPLOYMENT}"
-                    echo "APP_CONTAINER: ${env.APP_CONTAINER}"
-                    echo "APP_DOCKER_CONTEXT: ${env.APP_DOCKER_CONTEXT}"
-                    echo "APP_DOCKERFILE: ${env.APP_DOCKERFILE}"
-
-                    echo "=================================="
-                }
-            }
-        }
-
-        /*
-        ============================================================
-        DYNAMIC AWS ACCOUNT DETECTION
-        ============================================================
-        */
-
-        stage('Detect AWS Account ID') {
-
-            steps {
-
-                container('kaniko') {
-
-                    script {
-
-                        env.AWS_ACCOUNT_ID = sh(
-                            script: '''
-                                aws sts get-caller-identity \
-                                --query Account \
-                                --output text
-                            ''',
-                            returnStdout: true
-                        ).trim()
-
-                        echo "=================================="
-                        echo "Detected AWS Account ID"
-                        echo "=================================="
-
-                        echo "${env.AWS_ACCOUNT_ID}"
-
-                        echo "=================================="
-                    }
-                }
-            }
-        }
-
-        /*
-        ============================================================
-        TRIVY SECURITY SCAN
-        ============================================================
-        */
-
-        stage('Trivy Security Scan') {
-
-            steps {
-
-                container('trivy') {
-
-                    sh '''
-                        set -e
-
-                        echo "=================================="
-                        echo "Running Trivy Security Scan"
-                        echo "=================================="
-
-                        trivy fs \
-                          --severity HIGH,CRITICAL \
-                          --scanners vuln \
-                          --exit-code 0 \
-                          .
-
-                        echo ""
-                        echo "Trivy Scan Completed"
-                        echo "=================================="
-                    '''
-                }
-            }
-        }
-
-        /*
-        ============================================================
-        BUILD & PUSH IMAGE
-        ============================================================
-        */
-
-        stage('Build & Push Image') {
-
-            steps {
-
-                container('kaniko') {
-
-                    sh '''
-                        set -e
-
-                        . scripts/load-env.sh
-
-                        export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}"
-
-                        echo "=================================="
-                        echo "Using ECR Repository"
-                        echo "=================================="
-
-                        echo "$FULL_ECR_REPO"
-
-                        mkdir -p /kaniko/.docker
-
-                        cat > /kaniko/.docker/config.json <<EOF
-{
-  "auths": {
-    "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com": {}
-  }
-}
-EOF
-
-                        echo "=================================="
-                        echo "Building & Pushing Docker Image"
-                        echo "=================================="
-
-                        /kaniko/executor \
-                          --context=/home/jenkins/agent/workspace/frontend-pipeline/${APP_DOCKER_CONTEXT} \
-                          --dockerfile=/home/jenkins/agent/workspace/frontend-pipeline/${APP_DOCKERFILE} \
-                          --destination=${FULL_ECR_REPO}:${IMAGE_TAG} \
-                          --destination=${FULL_ECR_REPO}:latest \
-                          --cache=true \
-                          --verbosity=info
-                    '''
-                }
-            }
-        }
-
-        /*
-        ============================================================
-        DEPLOY TO KUBERNETES
-        ============================================================
-        */
-
-        stage('Deploy to Kubernetes') {
-
-            steps {
-
-                container('kubectl') {
-
-                    timeout(time: 10, unit: 'MINUTES') {
-
-                        sh '''
-                            set -e
-
-                            . scripts/load-env.sh
-
-                            export FULL_ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}"
-
-                            echo "=================================="
-                            echo "Deploying Application"
-                            echo "=================================="
-
-                            echo "Environment: $ENVIRONMENT"
-                            echo "Application: ${APP_NAME}"
-
-                            echo "Namespace: $APP_NAMESPACE"
-
-                            echo "Deployment: ${APP_DEPLOYMENT}"
-
-                            echo "Container: ${APP_CONTAINER}"
-
-                            echo "Image: ${FULL_ECR_REPO}:${IMAGE_TAG}"
-
-                            echo "=================================="
-
-                            kubectl set image deployment/${APP_DEPLOYMENT} \
-                              ${APP_CONTAINER}=${FULL_ECR_REPO}:${IMAGE_TAG} \
-                              -n ${APP_NAMESPACE}
-
-                            kubectl rollout status deployment/${APP_DEPLOYMENT} \
-                              -n ${APP_NAMESPACE}
-                        '''
-                    }
-                }
-            }
-        }
-    }
-
-    /*
-    ============================================================
-    POST ACTIONS
-    ============================================================
-    */
-
-    post {
-
-        success {
-
-            echo "✅ Pipeline Completed Successfully"
-        }
-
-        failure {
-
-            echo "❌ Pipeline Failed"
-        }
-
-        always {
-
-            echo "=================================="
-            echo "Pipeline Execution Finished"
-            echo "=================================="
-        }
-    }
-}
+Started by user Jenkins Admin
+Lightweight checkout support not available, falling back to full checkout.
+Checking out git https://github.com/MuhammadJaffar52/devops-infrastructure.git https://github.com/MuhammadJaffar52/devops-infrastructure.git into /var/jenkins_home/workspace/frontend-pipeline@script/f8a2478c3758c31a96c254659b9a4766985b5f3b7de34837cb4ddb42d3eb49c6 to read jenkins/pipelines/frontend.Jenkinsfile
+The recommended git tool is: git
+using credential github-token
+using credential github-token
+ > git rev-parse --resolve-git-dir /var/jenkins_home/workspace/frontend-pipeline@script/f8a2478c3758c31a96c254659b9a4766985b5f3b7de34837cb4ddb42d3eb49c6/.git # timeout=10
+Fetching changes from 2 remote Git repositories
+ > git config remote.origin.url https://github.com/MuhammadJaffar52/devops-infrastructure.git # timeout=10
+Fetching upstream changes from https://github.com/MuhammadJaffar52/devops-infrastructure.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.47.3'
+using GIT_ASKPASS to set credentials 
+ > git fetch --tags --force --progress -- https://github.com/MuhammadJaffar52/devops-infrastructure.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git config remote.origin1.url https://github.com/MuhammadJaffar52/devops-infrastructure.git # timeout=10
+Fetching upstream changes from https://github.com/MuhammadJaffar52/devops-infrastructure.git
+using GIT_ASKPASS to set credentials 
+ > git fetch --tags --force --progress -- https://github.com/MuhammadJaffar52/devops-infrastructure.git +refs/heads/*:refs/remotes/origin1/* # timeout=10
+Seen branch in repository origin/main
+Seen branch in repository origin1/main
+Seen 2 remote branches
+ > git show-ref --tags -d # timeout=10
+Checking out Revision ea3f10133c346d1641859dcf440e60dbf1496aa2 (origin/main, origin1/main)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f ea3f10133c346d1641859dcf440e60dbf1496aa2 # timeout=10
+Commit message: "pipeline fixed"
+ > git rev-list --no-walk 89f75f769ebd31b8f05209f1866068665c4f93ff # timeout=10
+ > git rev-list --no-walk 89f75f769ebd31b8f05209f1866068665c4f93ff # timeout=10
+org.codehaus.groovy.control.MultipleCompilationErrorsException: startup failed:
+WorkflowScript: 225: illegal string body character after dollar sign;
+   solution: either escape a literal dollar sign "\$5" or bracket the value expression "${5}" @ line 225, column 46.
+                    eval echo \\$${params.A
+                                 ^
+
+1 error
+
+	at org.codehaus.groovy.control.ErrorCollector.failIfErrors(ErrorCollector.java:309)
+	at org.codehaus.groovy.control.ErrorCollector.addFatalError(ErrorCollector.java:149)
+	at org.codehaus.groovy.control.ErrorCollector.addError(ErrorCollector.java:119)
+	at org.codehaus.groovy.control.ErrorCollector.addError(ErrorCollector.java:131)
+	at org.codehaus.groovy.control.SourceUnit.addError(SourceUnit.java:349)
+	at org.codehaus.groovy.antlr.AntlrParserPlugin.transformCSTIntoAST(AntlrParserPlugin.java:220)
+	at org.codehaus.groovy.antlr.AntlrParserPlugin.parseCST(AntlrParserPlugin.java:191)
+	at org.codehaus.groovy.control.SourceUnit.parse(SourceUnit.java:233)
+	at org.codehaus.groovy.control.CompilationUnit$1.call(CompilationUnit.java:189)
+	at org.codehaus.groovy.control.CompilationUnit.applyToSourceUnits(CompilationUnit.java:966)
+	at org.codehaus.groovy.control.CompilationUnit.doPhaseOperation(CompilationUnit.java:626)
+	at org.codehaus.groovy.control.CompilationUnit.processPhaseOperations(CompilationUnit.java:602)
+	at org.codehaus.groovy.control.CompilationUnit.compile(CompilationUnit.java:579)
+	at groovy.lang.GroovyClassLoader.doParseClass(GroovyClassLoader.java:323)
+	at groovy.lang.GroovyClassLoader.parseClass(GroovyClassLoader.java:293)
+	at PluginClassLoader for script-security//org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.GroovySandbox$Scope.parse(GroovySandbox.java:162)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsGroovyShell.doParse(CpsGroovyShell.java:202)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsGroovyShell.reparse(CpsGroovyShell.java:186)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsFlowExecution.parseScript(CpsFlowExecution.java:670)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsFlowExecution.start(CpsFlowExecution.java:616)
+	at PluginClassLoader for workflow-job//org.jenkinsci.plugins.workflow.job.WorkflowRun.run(WorkflowRun.java:344)
+	at hudson.model.ResourceController.execute(ResourceController.java:97)
+	at hudson.model.Executor.run(Executor.java:456)
+Finished: FAILURE
