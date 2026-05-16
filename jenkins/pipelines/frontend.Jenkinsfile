@@ -1,4 +1,3 @@
-
 pipeline {
 
     agent {
@@ -222,22 +221,20 @@ EOF
             }
         }
 
-       stage('Deploy To Kubernetes') {
-steps {
-container('kubectl') {
+        stage('Deploy To Kubernetes') {
+            steps {
 
+                container('kubectl') {
 
-        sh '''
-            echo "Deploying application"
+                    sh '''
+                        echo "Deploying application"
 
-            kubectl apply -f k8s/apps/frontend/
-        '''
+                        kubectl apply -f k8s/apps/frontend/
+                    '''
+                }
+            }
+        }
     }
-}
-
-
-}
-
 
     post {
 
@@ -254,4 +251,3 @@ container('kubectl') {
         }
     }
 }
-
