@@ -1,3 +1,4 @@
+
 pipeline {
     agent {
         kubernetes {
@@ -38,46 +39,26 @@ spec:
     }
 
     environment {
-        GIT_REPO = 'https://github.com/MuhammadJaffar52/devops-infrastructure.git'
-        GIT_BRANCH = 'main'
-
-        ENVIRONMENT = 'dev'
-
-        AWS_REGION = ''
-        AWS_ACCOUNT_ID = ''
-
-        APP_ECR_REPO = ''
-        APP_DEPLOYMENT = ''
-        APP_CONTAINER = ''
-        APP_DOCKER_CONTEXT = ''
-        APP_DOCKERFILE = ''
+        ENVIRONMENT = "dev"
+        AWS_REGION = "eu-west-1"
+        IMAGE_TAG = "latest"
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: "*/${GIT_BRANCH}"]],
-                    userRemoteConfigs: [[
-                        url: "${GIT_REPO}",
-                        credentialsId: 'github-token'
-                    ]]
-                ])
+                checkout scm
             }
         }
 
         stage('Load Environment Config') {
             steps {
-                container('kaniko') {
+                container('kubectl') {
                     sh '''
                         set -e
 
-                        export ENVIRONMENT=dev
-
                         chmod +x scripts/load-env.sh
-
                         sh scripts/load-env.sh
 
                         echo "Environment configuration loaded"
@@ -90,12 +71,11 @@ spec:
             steps {
                 script {
 
-                    def output = sh(
+                    def appConfig = sh(
                         script: '''
                             set -e
 
                             export ENVIRONMENT=dev
-
                             . scripts/load-env.sh >/dev/null 2>&1
 
                             echo "APP_ECR_REPO=$APP_ECR_REPO"
@@ -103,39 +83,17 @@ spec:
                             echo "APP_CONTAINER=$APP_CONTAINER"
                             echo "APP_DOCKER_CONTEXT=$APP_DOCKER_CONTEXT"
                             echo "APP_DOCKERFILE=$APP_DOCKERFILE"
-                            echo "AWS_REGION=$AWS_REGION"
                         ''',
                         returnStdout: true
                     ).trim()
 
-                    echo output
+                    echo appConfig
 
-                    def lines = output.split("\\n")
+                    appConfig.split("\\n").each { line ->
+                        def parts = line.split("=")
 
-                    for (line in lines) {
-
-                        if (line.startsWith("APP_ECR_REPO=")) {
-                            env.APP_ECR_REPO = line.replace("APP_ECR_REPO=", "").trim()
-                        }
-
-                        if (line.startsWith("APP_DEPLOYMENT=")) {
-                            env.APP_DEPLOYMENT = line.replace("APP_DEPLOYMENT=", "").trim()
-                        }
-
-                        if (line.startsWith("APP_CONTAINER=")) {
-                            env.APP_CONTAINER = line.replace("APP_CONTAINER=", "").trim()
-                        }
-
-                        if (line.startsWith("APP_DOCKER_CONTEXT=")) {
-                            env.APP_DOCKER_CONTEXT = line.replace("APP_DOCKER_CONTEXT=", "").trim()
-                        }
-
-                        if (line.startsWith("APP_DOCKERFILE=")) {
-                            env.APP_DOCKERFILE = line.replace("APP_DOCKERFILE=", "").trim()
-                        }
-
-                        if (line.startsWith("AWS_REGION=")) {
-                            env.AWS_REGION = line.replace("AWS_REGION=", "").trim()
+                        if (parts.length == 2) {
+                            env."${parts[0]}" = parts[1]
                         }
                     }
 
@@ -151,10 +109,7 @@ spec:
 
                         env.AWS_ACCOUNT_ID = sh(
                             script: '''
-                                printenv AWS_ACCESS_KEY_ID >/dev/null 2>&1 || exit 1
-                                printenv AWS_SECRET_ACCESS_KEY >/dev/null 2>&1 || exit 1
-
-                                echo "123456789012"
+                                echo 123456789012
                             ''',
                             returnStdout: true
                         ).trim()
@@ -169,7 +124,7 @@ spec:
             steps {
                 container('trivy') {
                     sh '''
-                        trivy fs . || true
+                        trivy fs .
                     '''
                 }
             }
@@ -178,13 +133,14 @@ spec:
         stage('Build & Push Image') {
             steps {
                 container('kaniko') {
+
                     sh '''
                         echo "Starting Docker build"
 
                         /kaniko/executor \
-                          --context=$WORKSPACE/$APP_DOCKER_CONTEXT \
-                          --dockerfile=$WORKSPACE/$APP_DOCKERFILE \
-                          --destination=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$APP_ECR_REPO:latest \
+                          --context=${WORKSPACE}/${APP_DOCKER_CONTEXT} \
+                          --dockerfile=${WORKSPACE}/${APP_DOCKERFILE} \
+                          --destination=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}:${IMAGE_TAG} \
                           --skip-tls-verify
                     '''
                 }
@@ -194,12 +150,11 @@ spec:
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
+
                     sh '''
                         echo "Deploying application"
 
-                        kubectl set image deployment/$APP_DEPLOYMENT \
-                        $APP_CONTAINER=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$APP_ECR_REPO:latest \
-                        -n app
+                        kubectl apply -f k8s/frontend/
                     '''
                 }
             }
@@ -207,7 +162,6 @@ spec:
     }
 
     post {
-
         always {
             echo 'Pipeline execution finished'
         }
@@ -221,3 +175,4 @@ spec:
         }
     }
 }
+
