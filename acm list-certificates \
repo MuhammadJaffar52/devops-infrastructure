@@ -1,0 +1,102 @@
+{
+    "CertificateSummaryList": [
+        {
+            "CertificateArn": "arn:aws:acm:eu-west-1:744804011934:certificate/78a553a2-99bf-4097-bcb3-5bffb01b9ee9",
+            "DomainName": "server.devops.local",
+            "SubjectAlternativeNameSummaries": [
+                "server.devops.local"
+            ],
+            "HasAdditionalSubjectAlternativeNames": false,
+            "Status": "ISSUED",
+            "Type": "IMPORTED",
+            "KeyAlgorithm": "RSA-2048",
+            "KeyUsages": [
+                "ANY"
+            ],
+            "ExtendedKeyUsages": [
+                "NONE"
+            ],
+            "ExportOption": "DISABLED",
+            "InUse": false,
+            "RenewalEligibility": "INELIGIBLE",
+            "NotBefore": "2026-05-11T21:51:06+00:00",
+            "NotAfter": "2036-05-08T21:51:06+00:00",
+            "CreatedAt": "2026-05-11T21:51:19.157000+00:00",
+            "ImportedAt": "2026-05-11T21:51:19.157000+00:00"
+        },
+        {
+            "CertificateArn": "arn:aws:acm:eu-west-1:744804011934:certificate/cfe8a338-f50a-4142-920c-e922c0452a52",
+            "DomainName": "server",
+            "SubjectAlternativeNameSummaries": [
+                "server"
+            ],
+            "HasAdditionalSubjectAlternativeNames": false,
+            "Status": "ISSUED",
+            "Type": "IMPORTED",
+            "KeyAlgorithm": "RSA-2048",
+            "KeyUsages": [
+                "DIGITAL_SIGNATURE",
+                "KEY_ENCIPHERMENT"
+            ],
+            "ExtendedKeyUsages": [
+                "TLS_WEB_SERVER_AUTHENTICATION"
+            ],
+            "ExportOption": "DISABLED",
+            "InUse": false,
+            "RenewalEligibility": "INELIGIBLE",
+            "NotBefore": "2026-05-12T05:39:58+00:00",
+            "NotAfter": "2028-08-14T05:39:58+00:00",
+            "CreatedAt": "2026-05-12T05:40:36.101000+00:00",
+            "ImportedAt": "2026-05-12T05:40:36.101000+00:00"
+        },
+        {
+            "CertificateArn": "arn:aws:acm:eu-west-1:744804011934:certificate/f83580e6-3cbf-45bb-90de-1cf7d30bfc94",
+            "DomainName": "client1.domain.tld",
+            "SubjectAlternativeNameSummaries": [
+                "client1.domain.tld"
+            ],
+            "HasAdditionalSubjectAlternativeNames": false,
+            "Status": "ISSUED",
+            "Type": "IMPORTED",
+            "KeyAlgorithm": "RSA-2048",
+            "KeyUsages": [
+                "DIGITAL_SIGNATURE"
+            ],
+            "ExtendedKeyUsages": [
+                "TLS_WEB_CLIENT_AUTHENTICATION"
+            ],
+            "ExportOption": "DISABLED",
+            "InUse": false,
+            "RenewalEligibility": "INELIGIBLE",
+            "NotBefore": "2026-05-12T05:40:01+00:00",
+            "NotAfter": "2028-08-14T05:40:01+00:00",
+            "CreatedAt": "2026-05-12T05:40:37.285000+00:00",
+            "ImportedAt": "2026-05-12T05:40:37.286000+00:00"
+        },
+        {
+            "CertificateArn": "arn:aws:acm:eu-west-1:744804011934:certificate/bb7823d5-298d-4a4a-b3b7-e94c14214862",
+            "DomainName": "vpn-server",
+            "SubjectAlternativeNameSummaries": [
+                "vpn-server"
+            ],
+            "HasAdditionalSubjectAlternativeNames": false,
+            "Status": "ISSUED",
+            "Type": "IMPORTED",
+            "KeyAlgorithm": "RSA-2048",
+            "KeyUsages": [
+                "DIGITAL_SIGNATURE",
+                "KEY_ENCIPHERMENT"
+            ],
+            "ExtendedKeyUsages": [
+                "TLS_WEB_SERVER_AUTHENTICATION"
+            ],
+            "ExportOption": "DISABLED",
+            "InUse": true,
+            "RenewalEligibility": "INELIGIBLE",
+            "NotBefore": "2026-05-12T09:03:00+00:00",
+            "NotAfter": "2028-08-14T09:03:00+00:00",
+            "CreatedAt": "2026-05-12T09:03:58.563000+00:00",
+            "ImportedAt": "2026-05-12T09:03:58.563000+00:00"
+        }
+    ]
+}

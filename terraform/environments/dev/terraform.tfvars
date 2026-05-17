@@ -21,9 +21,9 @@ domain_name = "dev.internal"
 # =========================================================
 # VPN CERTIFICATES
 # =========================================================
+server_certificate_arn = "arn:aws:acm:eu-west-1:744804011934:certificate/bb7823d5-298d-4a4a-b3b7-e94c14214862"
 
-server_certificate_arn      = "YOUR_SERVER_CERT_ARN"
-client_root_certificate_arn = "YOUR_CLIENT_CERT_ARN"
+client_root_certificate_arn = "arn:aws:acm:eu-west-1:744804011934:certificate/f83580e6-3cbf-45bb-90de-1cf7d30bfc94"
 
 # =========================================================
 # EKS NODE CONFIG (ADD THIS - IMPORTANT)
