@@ -1,23 +1,38 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
   name: backend
   namespace: app
 
+  labels:
+    app: backend
+    component: backend
+    managed-by: kubectl
+
 spec:
+
   replicas: 2
+
+  revisionHistoryLimit: 5
 
   selector:
     matchLabels:
       app: backend
 
   template:
+
     metadata:
       labels:
         app: backend
+        component: backend
 
     spec:
+
+      terminationGracePeriodSeconds: 30
+
       containers:
+
         - name: backend
 
           image: BACKEND_IMAGE
@@ -28,6 +43,7 @@ spec:
             - containerPort: 3000
 
           env:
+
             - name: MONGO_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -42,3 +58,47 @@ spec:
 
             - name: MONGO_URI
               value: "mongodb://$(MONGO_USERNAME):$(MONGO_PASSWORD)@mongodb.app.svc.cluster.local:27017/?authSource=admin"
+
+          resources:
+
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          readinessProbe:
+
+            tcpSocket:
+              port: 3000
+
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          livenessProbe:
+
+            tcpSocket:
+              port: 3000
+
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          securityContext:
+
+            allowPrivilegeEscalation: false
+
+            readOnlyRootFilesystem: false
+
+            runAsNonRoot: true
+
+            runAsUser: 1001
+
+            capabilities:
+              drop:
+                - ALL

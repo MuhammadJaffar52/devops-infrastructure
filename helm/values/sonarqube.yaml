@@ -1,14 +1,15 @@
 community:
   enabled: true
 
-monitoringPasscode: "admin1234"
+monitoringPasscode: "${SONAR_MONITORING_PASSCODE}"
 
 postgresql:
   image:
     tag: 15.6.0-debian-11-r16
+
   auth:
-    password: ICY9BATZy6
     username: sonarqube
+    password: "${SONAR_DB_PASSWORD}"
     database: sonarqube
 
 initSysctl:
@@ -17,3 +18,15 @@ initSysctl:
   fsFileMax: 131072
   nofile: 131072
   nproc: 8192
+
+# =========================================================
+# PRODUCTION HARDENING (RECOMMENDED ADDITION)
+# =========================================================
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2000m
+    memory: 4Gi

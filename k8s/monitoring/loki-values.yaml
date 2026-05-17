@@ -1,28 +1,30 @@
-loki:
-  auth_enabled: false
+auth_enabled: false
 
-  commonConfig:
-    replication_factor: 1
+commonConfig:
+  replication_factor: 1
 
-  storage:
-    type: filesystem
+storage:
+  type: filesystem
 
-  schemaConfig:
-    configs:
-      - from: "2024-01-01"
-        store: tsdb
-        object_store: filesystem
-        schema: v13
-        index:
-          prefix: index_
-          period: 24h
+schemaConfig:
+  configs:
+    - from: "2024-01-01"
+      store: tsdb
+      object_store: filesystem
+      schema: v12
+      index:
+        prefix: index_
+        period: 24h
 
-  limits_config:
-    retention_period: 168h   # 7 days retention
+limits_config:
+  retention_period: 168h
 
-  # Helps avoid silent memory issues
-  server:
-    http_listen_port: 3100
+server:
+  http_listen_port: 3100
+
+ingester:
+  wal:
+    enabled: true
 
 deploymentMode: SingleBinary
 
@@ -31,64 +33,18 @@ singleBinary:
 
   resources:
     requests:
-      cpu: 200m
-      memory: 256Mi
-    limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
 
-  # IMPORTANT: persistence added (fixes data loss problem)
   persistence:
     enabled: true
     size: 10Gi
-    storageClass: gp3   # matches AWS EKS best practice
-
-  extraContainers: []
-  extraVolumes: []
-  extraVolumeMounts: []
-
-chunksCache:
-  enabled: false
-
-resultsCache:
-  enabled: false
+    storageClass: gp3
 
 gateway:
   enabled: true
-
-  replicas: 1
-
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
-
   ingress:
-    enabled: false   # enable later when ALB is ready
-
-read:
-  replicas: 0
-
-write:
-  replicas: 0
-
-backend:
-  replicas: 0
-
-minio:
-  enabled: false
-
-monitoring:
-  selfMonitoring:
     enabled: false
-    grafanaAgent:
-      installOperator: false
-
-  lokiCanary:
-    enabled: false
-
-test:
-  enabled: false

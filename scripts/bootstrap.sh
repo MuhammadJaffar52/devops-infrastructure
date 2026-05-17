@@ -12,8 +12,9 @@
 # - Environment-based deployment
 # - Dynamic configuration loading
 # - Validation checks
-# - Better logging
 # - Production-grade reusable deployment
+# - Idempotent deployment flow
+# - Centralized configuration loading
 # ============================================================
 
 set -euo pipefail
@@ -35,12 +36,14 @@ NC='\033[0m'
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 # ============================================================
-# ENVIRONMENT VALIDATION
+# ENVIRONMENT
 # ============================================================
 
 export ENVIRONMENT=${ENVIRONMENT:-dev}
 
-CONFIG_FILE="$ROOT_DIR/configs/${ENVIRONMENT}.env"
+# ============================================================
+# LOAD ENVIRONMENT CONFIGURATION
+# ============================================================
 
 echo -e "${BLUE}"
 echo "=================================================="
@@ -50,48 +53,39 @@ echo -e "${NC}"
 
 echo "Selected Environment: $ENVIRONMENT"
 
-# ============================================================
-# CHECK CONFIG FILE
-# ============================================================
+chmod +x "$ROOT_DIR/scripts/load-env.sh"
 
-if [ ! -f "$CONFIG_FILE" ]; then
-  echo -e "${RED}ERROR:${NC} Config file not found:"
-  echo "$CONFIG_FILE"
-  exit 1
-fi
+source "$ROOT_DIR/scripts/load-env.sh"
 
 # ============================================================
-# LOAD CONFIGURATION
-# ============================================================
-
-echo ""
-echo -e "${BLUE}Loading Environment Configuration...${NC}"
-
-source "$CONFIG_FILE"
-
-echo ""
-echo "Loaded Configuration:"
-echo "AWS Region: $AWS_REGION"
-echo "Environment: $ENVIRONMENT"
-
-# ============================================================
-# CHECK REQUIRED VARIABLES
+# REQUIRED VARIABLES VALIDATION
 # ============================================================
 
 REQUIRED_VARIABLES=(
   AWS_REGION
   ENVIRONMENT
+  APP_NAMESPACE
+  JENKINS_NAMESPACE
+  MONITORING_NAMESPACE
+  TRIVY_NAMESPACE
 )
 
+echo ""
+echo -e "${BLUE}Validating Required Variables...${NC}"
+
 for VAR in "${REQUIRED_VARIABLES[@]}"; do
+
   if [ -z "${!VAR:-}" ]; then
     echo -e "${RED}ERROR:${NC} Missing variable: $VAR"
     exit 1
   fi
+
+  echo -e "${GREEN}✔${NC} $VAR loaded"
+
 done
 
 # ============================================================
-# CHECK DEPENDENCIES
+# CHECK REQUIRED TOOLS
 # ============================================================
 
 echo ""
@@ -106,12 +100,14 @@ REQUIRED_COMMANDS=(
 )
 
 for cmd in "${REQUIRED_COMMANDS[@]}"; do
-  if ! command -v $cmd >/dev/null 2>&1; then
+
+  if ! command -v "$cmd" >/dev/null 2>&1; then
     echo -e "${RED}ERROR:${NC} $cmd is not installed"
     exit 1
   fi
 
   echo -e "${GREEN}✔${NC} $cmd installed"
+
 done
 
 # ============================================================
@@ -125,23 +121,30 @@ AWS_ACCOUNT_ID=$(aws sts get-caller-identity \
   --query Account \
   --output text)
 
-echo "Connected AWS Account ID:"
-echo "$AWS_ACCOUNT_ID"
+AWS_USER_ARN=$(aws sts get-caller-identity \
+  --query Arn \
+  --output text)
+
+echo ""
+echo "AWS Account ID : $AWS_ACCOUNT_ID"
+echo "AWS Identity   : $AWS_USER_ARN"
 
 # ============================================================
-# TERRAFORM DIRECTORY
+# TERRAFORM ENVIRONMENT DIRECTORY
 # ============================================================
 
 TF_DIR="$ROOT_DIR/terraform/environments/$ENVIRONMENT"
 
 if [ ! -d "$TF_DIR" ]; then
+
   echo -e "${RED}ERROR:${NC} Terraform environment not found:"
   echo "$TF_DIR"
+
   exit 1
 fi
 
 # ============================================================
-# TERRAFORM INIT
+# TERRAFORM INITIALIZATION
 # ============================================================
 
 echo ""
@@ -152,7 +155,16 @@ cd "$TF_DIR"
 terraform init
 
 # ============================================================
-# TERRAFORM VALIDATE
+# TERRAFORM FORMAT VALIDATION
+# ============================================================
+
+echo ""
+echo -e "${BLUE}Checking Terraform Formatting...${NC}"
+
+terraform fmt -check -recursive
+
+# ============================================================
+# TERRAFORM VALIDATION
 # ============================================================
 
 echo ""
@@ -183,7 +195,7 @@ terraform apply -auto-approve \
   -var="environment=$ENVIRONMENT"
 
 # ============================================================
-# GET TERRAFORM OUTPUTS
+# FETCH TERRAFORM OUTPUTS
 # ============================================================
 
 echo ""
@@ -193,8 +205,9 @@ CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
 
 AWS_REGION_OUTPUT=$(terraform output -raw aws_region)
 
-echo "EKS Cluster:"
-echo "$CLUSTER_NAME"
+echo ""
+echo "EKS Cluster : $CLUSTER_NAME"
+echo "AWS Region  : $AWS_REGION_OUTPUT"
 
 # ============================================================
 # UPDATE KUBECONFIG
@@ -208,24 +221,15 @@ aws eks update-kubeconfig \
   --name "$CLUSTER_NAME"
 
 # ============================================================
-# VERIFY CLUSTER ACCESS
+# VERIFY KUBERNETES ACCESS
 # ============================================================
 
 echo ""
-echo -e "${BLUE}Verifying Kubernetes Cluster Access...${NC}"
+echo -e "${BLUE}Verifying Kubernetes Access...${NC}"
+
+kubectl cluster-info
 
 kubectl get nodes
-
-# ============================================================
-# DEPLOY HELM RELEASES
-# ============================================================
-
-echo ""
-echo -e "${BLUE}Deploying Helm Releases...${NC}"
-
-cd "$ROOT_DIR/helm"
-
-helmfile sync
 
 # ============================================================
 # DEPLOY BASE RESOURCES
@@ -239,20 +243,33 @@ cd "$ROOT_DIR"
 kubectl apply -f k8s/base/
 
 # ============================================================
+# DEPLOY HELM RELEASES
+# ============================================================
+
+echo ""
+echo -e "${BLUE}Deploying Helm Releases...${NC}"
+
+cd "$ROOT_DIR/helm"
+
+helmfile sync
+
+# ============================================================
 # DEPLOY PLATFORM COMPONENTS
 # ============================================================
 
 echo ""
 echo -e "${BLUE}Deploying Platform Components...${NC}"
 
+cd "$ROOT_DIR"
+
 kubectl apply -f k8s/platform/
 
 # ============================================================
-# DEPLOY MONITORING STACK
+# DEPLOY MONITORING COMPONENTS
 # ============================================================
 
 echo ""
-echo -e "${BLUE}Deploying Monitoring Stack...${NC}"
+echo -e "${BLUE}Deploying Monitoring Components...${NC}"
 
 kubectl apply -f k8s/monitoring/
 
@@ -266,13 +283,34 @@ echo -e "${BLUE}Deploying Applications...${NC}"
 kubectl apply -f k8s/apps/
 
 # ============================================================
+# WAIT FOR DEPLOYMENTS
+# ============================================================
+
+echo ""
+echo -e "${BLUE}Waiting For Deployments...${NC}"
+
+kubectl rollout status deployment/frontend \
+  -n "$APP_NAMESPACE" \
+  --timeout=300s || true
+
+kubectl rollout status deployment/backend \
+  -n "$APP_NAMESPACE" \
+  --timeout=300s || true
+
+# ============================================================
 # FINAL VALIDATION
 # ============================================================
 
 echo ""
-echo -e "${BLUE}Validating Deployments...${NC}"
+echo -e "${BLUE}Cluster Resource Summary${NC}"
 
 kubectl get pods -A
+
+echo ""
+kubectl get svc -A
+
+echo ""
+kubectl get ingress -A
 
 # ============================================================
 # SUCCESS MESSAGE
@@ -285,7 +323,7 @@ echo " Bootstrap Completed Successfully"
 echo "=================================================="
 echo -e "${NC}"
 
-echo "Environment: $ENVIRONMENT"
-echo "AWS Account: $AWS_ACCOUNT_ID"
-echo "AWS Region: $AWS_REGION"
-echo "EKS Cluster: $CLUSTER_NAME"
+echo "Environment  : $ENVIRONMENT"
+echo "AWS Account  : $AWS_ACCOUNT_ID"
+echo "AWS Region   : $AWS_REGION"
+echo "EKS Cluster  : $CLUSTER_NAME"

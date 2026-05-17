@@ -1,17 +1,6 @@
 # =========================================================
 # AWS REGION
 # =========================================================
-#
-# Controls deployment region.
-#
-# Examples:
-# - eu-west-1
-# - us-east-1
-# - ap-south-1
-#
-# PHASE 5 IMPROVEMENT:
-# Removed hardcoded AWS region dependency.
-# =========================================================
 
 variable "aws_region" {
 
@@ -23,15 +12,6 @@ variable "aws_region" {
 # =========================================================
 # ENVIRONMENT
 # =========================================================
-#
-# Supported:
-# - dev
-# - staging
-# - prod
-#
-# PHASE 5 IMPROVEMENT:
-# Enables multi-environment deployments.
-# =========================================================
 
 variable "environment" {
 
@@ -40,46 +20,35 @@ variable "environment" {
   type = string
 
   validation {
-
     condition = contains(
       ["dev", "staging", "prod"],
       var.environment
     )
 
-    error_message =
-      "Environment must be dev, staging, or prod."
+    error_message = "Environment must be dev, staging, or prod."
   }
 }
 
 # =========================================================
 # DOMAIN NAME
 # =========================================================
-#
-# Base domain for ingress and DNS.
-#
-# Example:
-# example.com
-# =========================================================
 
 variable "domain_name" {
 
-  description = "Base domain name"
+  description = "Base domain name for ingress"
 
   type = string
+
+  default = null
+
+  validation {
+    condition = var.domain_name == null || can(regex("^[a-zA-Z0-9.-]+$", var.domain_name))
+    error_message = "Invalid domain name format."
+  }
 }
 
 # =========================================================
 # VPC CIDR
-# =========================================================
-#
-# Example:
-# 10.0.0.0/16
-#
-# PHASE 5 IMPROVEMENT:
-# Makes networking reusable across:
-# - accounts
-# - regions
-# - environments
 # =========================================================
 
 variable "vpc_cidr" {
@@ -90,25 +59,27 @@ variable "vpc_cidr" {
 }
 
 # =========================================================
-# VPN SERVER CERTIFICATE
+# VPN SERVER CERTIFICATE (OPTIONAL SAFE MODE)
 # =========================================================
 
 variable "server_certificate_arn" {
 
-  description =
-    "ARN of ACM server certificate for AWS Client VPN"
+  description = "ACM server certificate ARN for Client VPN"
 
   type = string
+
+  default = null
 }
 
 # =========================================================
-# VPN CLIENT ROOT CERTIFICATE
+# VPN CLIENT ROOT CERTIFICATE (OPTIONAL SAFE MODE)
 # =========================================================
 
 variable "client_root_certificate_arn" {
 
-  description =
-    "ARN of client root certificate for AWS Client VPN"
+  description = "Client root certificate ARN for VPN authentication"
 
   type = string
+
+  default = null
 }

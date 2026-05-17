@@ -1,0 +1,11 @@
+global:
+  environment: prod
+
+sonarqube:
+  replicaCount: 2
+
+jenkins:
+  replicaCount: 2
+
+externalSecrets:
+  logLevel: warn

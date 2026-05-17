@@ -1,14 +1,31 @@
 # =========================================================
 # DATA SOURCES
 # =========================================================
-#
-# Dynamically fetch availability zones.
-#
-# PHASE 5 IMPROVEMENT:
-# Removes hardcoded AZ dependency.
+
+data "aws_availability_zones" "available" {
+
+  state = "available"
+}
+
+# =========================================================
+# LOCALS
 # =========================================================
 
-data "aws_availability_zones" "available" {}
+locals {
+
+  common_tags = {
+
+    Project     = "devops-infrastructure"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+
+  azs = slice(
+    data.aws_availability_zones.available.names,
+    0,
+    2
+  )
+}
 
 # =========================================================
 # VPC
@@ -22,10 +39,14 @@ resource "aws_vpc" "main" {
 
   enable_dns_hostnames = true
 
-  tags = {
+  tags = merge(
 
-    Name = "${var.environment}-devops-vpc"
-  }
+    local.common_tags,
+
+    {
+      Name = "${var.environment}-devops-vpc"
+    }
+  )
 }
 
 # =========================================================
@@ -36,10 +57,14 @@ resource "aws_internet_gateway" "igw" {
 
   vpc_id = aws_vpc.main.id
 
-  tags = {
+  tags = merge(
 
-    Name = "${var.environment}-igw"
-  }
+    local.common_tags,
+
+    {
+      Name = "${var.environment}-igw"
+    }
+  )
 }
 
 # =========================================================
@@ -52,19 +77,22 @@ resource "aws_subnet" "public_1" {
 
   cidr_block = cidrsubnet(var.vpc_cidr, 8, 1)
 
-  availability_zone =
-    data.aws_availability_zones.available.names[0]
+  availability_zone = local.azs[0]
 
   map_public_ip_on_launch = true
 
-  tags = {
+  tags = merge(
 
-    Name = "${var.environment}-public-subnet-1"
+    local.common_tags,
 
-    "kubernetes.io/role/elb" = "1"
+    {
+      Name = "${var.environment}-public-subnet-1"
 
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-  }
+      "kubernetes.io/role/elb" = "1"
+
+      "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    }
+  )
 }
 
 # =========================================================
@@ -77,19 +105,22 @@ resource "aws_subnet" "public_2" {
 
   cidr_block = cidrsubnet(var.vpc_cidr, 8, 2)
 
-  availability_zone =
-    data.aws_availability_zones.available.names[1]
+  availability_zone = local.azs[1]
 
   map_public_ip_on_launch = true
 
-  tags = {
+  tags = merge(
 
-    Name = "${var.environment}-public-subnet-2"
+    local.common_tags,
 
-    "kubernetes.io/role/elb" = "1"
+    {
+      Name = "${var.environment}-public-subnet-2"
 
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-  }
+      "kubernetes.io/role/elb" = "1"
+
+      "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    }
+  )
 }
 
 # =========================================================
@@ -102,17 +133,20 @@ resource "aws_subnet" "private_1" {
 
   cidr_block = cidrsubnet(var.vpc_cidr, 8, 3)
 
-  availability_zone =
-    data.aws_availability_zones.available.names[0]
+  availability_zone = local.azs[0]
 
-  tags = {
+  tags = merge(
 
-    Name = "${var.environment}-private-subnet-1"
+    local.common_tags,
 
-    "kubernetes.io/role/internal-elb" = "1"
+    {
+      Name = "${var.environment}-private-subnet-1"
 
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-  }
+      "kubernetes.io/role/internal-elb" = "1"
+
+      "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    }
+  )
 }
 
 # =========================================================
@@ -125,17 +159,20 @@ resource "aws_subnet" "private_2" {
 
   cidr_block = cidrsubnet(var.vpc_cidr, 8, 4)
 
-  availability_zone =
-    data.aws_availability_zones.available.names[1]
+  availability_zone = local.azs[1]
 
-  tags = {
+  tags = merge(
 
-    Name = "${var.environment}-private-subnet-2"
+    local.common_tags,
 
-    "kubernetes.io/role/internal-elb" = "1"
+    {
+      Name = "${var.environment}-private-subnet-2"
 
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-  }
+      "kubernetes.io/role/internal-elb" = "1"
+
+      "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    }
+  )
 }
 
 # =========================================================
@@ -146,10 +183,14 @@ resource "aws_eip" "nat" {
 
   domain = "vpc"
 
-  tags = {
+  tags = merge(
 
-    Name = "${var.environment}-nat-eip"
-  }
+    local.common_tags,
+
+    {
+      Name = "${var.environment}-nat-eip"
+    }
+  )
 }
 
 # =========================================================
@@ -162,15 +203,18 @@ resource "aws_nat_gateway" "nat" {
 
   subnet_id = aws_subnet.public_1.id
 
-  tags = {
-
-    Name = "${var.environment}-nat"
-  }
-
   depends_on = [
-
     aws_internet_gateway.igw
   ]
+
+  tags = merge(
+
+    local.common_tags,
+
+    {
+      Name = "${var.environment}-nat"
+    }
+  )
 }
 
 # =========================================================
@@ -188,10 +232,14 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.igw.id
   }
 
-  tags = {
+  tags = merge(
 
-    Name = "${var.environment}-public-rt"
-  }
+    local.common_tags,
+
+    {
+      Name = "${var.environment}-public-rt"
+    }
+  )
 }
 
 # =========================================================
@@ -209,10 +257,14 @@ resource "aws_route_table" "private" {
     nat_gateway_id = aws_nat_gateway.nat.id
   }
 
-  tags = {
+  tags = merge(
 
-    Name = "${var.environment}-private-rt"
-  }
+    local.common_tags,
+
+    {
+      Name = "${var.environment}-private-rt"
+    }
+  )
 }
 
 # =========================================================

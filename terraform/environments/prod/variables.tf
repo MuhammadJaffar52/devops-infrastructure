@@ -1,10 +1,11 @@
 variable "aws_region" {
-description = "AWS region"
-type        = string
+  description = "AWS region"
+  type        = string
 }
 
 variable "vpc_cidr" {
-  type = string
+  description = "VPC CIDR block"
+  type        = string
 }
 
 variable "server_certificate_arn" {

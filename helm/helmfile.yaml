@@ -2,16 +2,55 @@ repositories:
   - name: bitnami
     url: https://charts.bitnami.com/bitnami
 
+  - name: external-secrets
+    url: https://charts.external-secrets.io
+
+# =========================================================
+# ENVIRONMENT CONFIGURATION
+# =========================================================
+environments:
+  dev:
+    values:
+      - values/dev.yaml
+
+  staging:
+    values:
+      - values/staging.yaml
+
+  prod:
+    values:
+      - values/prod.yaml
+
+# =========================================================
+# SHARED DEFAULT VALUES (GLOBAL OVERRIDES)
+# =========================================================
+helmDefaults:
+  createNamespace: true
+  wait: true
+  timeout: 600
+  atomic: true
+
+# =========================================================
+# RELEASES
+# =========================================================
 releases:
+
+  # =========================================================
+  # SONARQUBE
+  # =========================================================
   - name: sonarqube
     namespace: sonarqube
-    createNamespace: true
     chart: bitnami/sonarqube
     values:
       - values/sonarqube.yaml
+      - values/{{ .Environment.Name }}.yaml
 
+  # =========================================================
+  # EXTERNAL SECRETS
+  # =========================================================
   - name: external-secrets
     namespace: external-secrets
     chart: external-secrets/external-secrets
     values:
       - values/external-secrets.yaml
+      - values/{{ .Environment.Name }}.yaml

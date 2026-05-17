@@ -1,76 +1,235 @@
 # =========================================================
-# AWS REGION
+# LOCALS
 # =========================================================
 
-variable "aws_region" {
+locals {
 
-  description = "AWS region"
+  common_tags = {
 
-  type = string
+    Project     = "devops-infrastructure"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
 }
 
 # =========================================================
-# ENVIRONMENT
+# EKS CLUSTER IAM ROLE
 # =========================================================
 
-variable "environment" {
+resource "aws_iam_role" "eks_cluster_role" {
 
-  description = "Deployment environment"
+  name = "${var.environment}-eks-cluster-role"
 
-  type = string
+  assume_role_policy = jsonencode({
+
+    Version = "2012-10-17"
+
+    Statement = [
+
+      {
+        Effect = "Allow"
+
+        Principal = {
+          Service = "eks.amazonaws.com"
+        }
+
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = local.common_tags
 }
 
 # =========================================================
-# PRIVATE SUBNETS
+# EKS CLUSTER IAM POLICIES
 # =========================================================
 
-variable "private_subnets" {
+resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
 
-  description = "Private subnet IDs"
+  role = aws_iam_role.eks_cluster_role.name
 
-  type = list(string)
+  policy_arn =
+    "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
 # =========================================================
-# NODE INSTANCE TYPE
+# EKS NODE IAM ROLE
 # =========================================================
 
-variable "node_instance_type" {
+resource "aws_iam_role" "eks_node_role" {
 
-  description = "EKS worker node instance type"
+  name = "${var.environment}-eks-node-role"
 
-  type = string
+  assume_role_policy = jsonencode({
+
+    Version = "2012-10-17"
+
+    Statement = [
+
+      {
+        Effect = "Allow"
+
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = local.common_tags
 }
 
 # =========================================================
-# NODE DESIRED SIZE
+# NODE IAM POLICIES
 # =========================================================
 
-variable "node_desired_size" {
+resource "aws_iam_role_policy_attachment" "worker_node_policy" {
 
-  description = "Desired number of worker nodes"
+  role = aws_iam_role.eks_node_role.name
 
-  type = number
+  policy_arn =
+    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "cni_policy" {
+
+  role = aws_iam_role.eks_node_role.name
+
+  policy_arn =
+    "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
+resource "aws_iam_role_policy_attachment" "ecr_policy" {
+
+  role = aws_iam_role.eks_node_role.name
+
+  policy_arn =
+    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
 # =========================================================
-# NODE MAX SIZE
+# EKS CLUSTER
 # =========================================================
 
-variable "node_max_size" {
+resource "aws_eks_cluster" "main" {
 
-  description = "Maximum number of worker nodes"
+  name = var.cluster_name
 
-  type = number
+  role_arn = aws_iam_role.eks_cluster_role.arn
+
+  version = "1.31"
+
+  vpc_config {
+
+    subnet_ids = var.private_subnets
+
+    endpoint_private_access = true
+
+    endpoint_public_access = true
+  }
+
+  depends_on = [
+
+    aws_iam_role_policy_attachment.eks_cluster_policy
+  ]
+
+  tags = merge(
+
+    local.common_tags,
+
+    {
+      Name = var.cluster_name
+    }
+  )
 }
 
 # =========================================================
-# NODE MIN SIZE
+# EKS NODE GROUP
 # =========================================================
 
-variable "node_min_size" {
+resource "aws_eks_node_group" "main" {
 
-  description = "Minimum number of worker nodes"
+  cluster_name = aws_eks_cluster.main.name
 
-  type = number
+  node_group_name = var.node_group_name
+
+  node_role_arn = aws_iam_role.eks_node_role.arn
+
+  subnet_ids = var.private_subnets
+
+  instance_types = var.instance_types
+
+  scaling_config {
+
+    desired_size = var.desired_size
+
+    min_size = var.min_size
+
+    max_size = var.max_size
+  }
+
+  capacity_type = "ON_DEMAND"
+
+  ami_type = "AL2023_x86_64_STANDARD"
+
+  disk_size = 30
+
+  depends_on = [
+
+    aws_iam_role_policy_attachment.worker_node_policy,
+    aws_iam_role_policy_attachment.cni_policy,
+    aws_iam_role_policy_attachment.ecr_policy
+  ]
+
+  tags = merge(
+
+    local.common_tags,
+
+    {
+      Name = var.node_group_name
+    }
+  )
+}
+
+# =========================================================
+# EKS ADDONS
+# =========================================================
+
+resource "aws_eks_addon" "vpc_cni" {
+
+  cluster_name = aws_eks_cluster.main.name
+
+  addon_name = "vpc-cni"
+
+  resolve_conflicts_on_create = "OVERWRITE"
+}
+
+resource "aws_eks_addon" "coredns" {
+
+  cluster_name = aws_eks_cluster.main.name
+
+  addon_name = "coredns"
+
+  resolve_conflicts_on_create = "OVERWRITE"
+}
+
+resource "aws_eks_addon" "kube_proxy" {
+
+  cluster_name = aws_eks_cluster.main.name
+
+  addon_name = "kube-proxy"
+
+  resolve_conflicts_on_create = "OVERWRITE"
+}
+
+resource "aws_eks_addon" "ebs_csi" {
+
+  cluster_name = aws_eks_cluster.main.name
+
+  addon_name = "aws-ebs-csi-driver"
+
+  resolve_conflicts_on_create = "OVERWRITE"
 }

@@ -1,45 +1,126 @@
 apiVersion: apps/v1
 kind: StatefulSet
+
 metadata:
   name: mongodb
   namespace: app
+
+  labels:
+    app: mongodb
+    component: database
+
 spec:
+
   serviceName: mongodb
+
   replicas: 1
+
+  podManagementPolicy: OrderedReady
+
   selector:
     matchLabels:
       app: mongodb
+
+  updateStrategy:
+    type: RollingUpdate
+
   template:
+
     metadata:
       labels:
         app: mongodb
+        component: database
+
     spec:
+
+      terminationGracePeriodSeconds: 30
+
       containers:
+
         - name: mongodb
+
           image: mongo:7
+
+          imagePullPolicy: IfNotPresent
+
           ports:
             - containerPort: 27017
+
           env:
+
             - name: MONGO_INITDB_ROOT_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: mongodb-secret
                   key: MONGO_USERNAME
+
             - name: MONGO_INITDB_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mongodb-secret
                   key: MONGO_PASSWORD
+
+          resources:
+
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+
+          readinessProbe:
+
+            tcpSocket:
+              port: 27017
+
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+
+          livenessProbe:
+
+            tcpSocket:
+              port: 27017
+
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+
+          securityContext:
+
+            allowPrivilegeEscalation: false
+
+            readOnlyRootFilesystem: false
+
+            runAsNonRoot: true
+
+            runAsUser: 999
+
+            capabilities:
+              drop:
+                - ALL
+
           volumeMounts:
+
             - name: mongodb-data
               mountPath: /data/db
+
   volumeClaimTemplates:
+
     - metadata:
         name: mongodb-data
+
       spec:
+
         accessModes:
           - ReadWriteOnce
+
         storageClassName: gp3
+
         resources:
           requests:
             storage: 10Gi

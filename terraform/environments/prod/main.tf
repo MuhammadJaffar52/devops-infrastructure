@@ -1,16 +1,37 @@
+# =========================================================
+# AWS PROVIDER (PORTABLE)
+# =========================================================
+
 provider "aws" {
-  region = "eu-west-1"
+  region = var.aws_region
 }
+
+# =========================================================
+# VPC MODULE
+# =========================================================
 
 module "vpc" {
   source = "../../modules/vpc"
+
+  environment = var.environment
+  vpc_cidr    = var.vpc_cidr
 }
+
+# =========================================================
+# EKS MODULE
+# =========================================================
 
 module "eks" {
   source = "../../modules/eks"
 
+  aws_region      = var.aws_region
+  environment     = var.environment
   private_subnets = module.vpc.private_subnet_ids
 }
+
+# =========================================================
+# VPN MODULE
+# =========================================================
 
 module "vpn" {
   source = "../../modules/vpn"

@@ -3,14 +3,23 @@ persistence:
 
 controller:
   admin:
-    password: admin123
+    username: admin
+    password: "${JENKINS_ADMIN_PASSWORD}"
+
   serviceType: ClusterIP
+
+  # =========================================================
+  # SECURITY WARNING:
+  # Docker socket gives full node access.
+  # Use only in dev/staging, NOT production.
+  # =========================================================
 
   volumes:
     - name: docker-sock
       hostPath:
         path: /var/run/docker.sock
         type: Socket
+
     - name: docker-bin
       hostPath:
         path: /usr/bin/docker
@@ -19,5 +28,6 @@ controller:
   volumeMounts:
     - name: docker-sock
       mountPath: /var/run/docker.sock
+
     - name: docker-bin
       mountPath: /usr/bin/docker
