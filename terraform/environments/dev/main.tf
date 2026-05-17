@@ -2,22 +2,38 @@
 # PROVIDER (INHERITS GLOBAL CONFIG STANDARD)
 # =========================================================
 
-provider "aws" {
-  region = var.aws_region
-}
+
 
 # =========================================================
 # VPC MODULE
 # =========================================================
-
 module "vpc" {
 
   source = "../../modules/vpc"
 
-  environment = var.environment
-  vpc_cidr    = var.vpc_cidr
-}
+  aws_region = var.aws_region
 
+  environment = var.environment
+
+  cluster_name = "${var.environment}-eks"
+
+  vpc_cidr = var.vpc_cidr
+
+  availability_zones = [
+    "${var.aws_region}a",
+    "${var.aws_region}b"
+  ]
+
+  public_subnet_cidrs = [
+    "10.0.1.0/24",
+    "10.0.2.0/24"
+  ]
+
+  private_subnet_cidrs = [
+    "10.0.10.0/24",
+    "10.0.11.0/24"
+  ]
+}
 # =========================================================
 # EKS MODULE
 # =========================================================
@@ -26,8 +42,8 @@ module "eks" {
 
   source = "../../modules/eks"
 
-  aws_region     = var.aws_region
-  environment    = var.environment
+  aws_region      = var.aws_region
+  environment     = var.environment
   private_subnets = module.vpc.private_subnet_ids
 }
 
@@ -45,28 +61,4 @@ module "vpn" {
 
   client_root_certificate_arn = var.client_root_certificate_arn
   server_certificate_arn      = var.server_certificate_arn
-}
-
-# =========================================================
-# OUTPUTS (CRITICAL FOR CI/CD + HELM)
-# =========================================================
-
-output "vpc_id" {
-  value = module.vpc.vpc_id
-}
-
-output "private_subnets" {
-  value = module.vpc.private_subnet_ids
-}
-
-output "cluster_name" {
-  value = module.eks.cluster_name
-}
-
-output "cluster_endpoint" {
-  value = module.eks.cluster_endpoint
-}
-
-output "vpn_endpoint_id" {
-  value = module.vpn.client_vpn_endpoint_id
 }
