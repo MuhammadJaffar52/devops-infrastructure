@@ -32,6 +32,9 @@ private_subnet_cidrs = [
 
 domain_name = "dev.internal"
 
+
+kubernetes_version = "1.31"
+
 # =========================================================
 # VPN CERTIFICATES
 # =========================================================
@@ -40,10 +43,15 @@ server_certificate_arn = "arn:aws:acm:eu-west-1:744804011934:certificate/bb7823d
 client_root_certificate_arn = "arn:aws:acm:eu-west-1:744804011934:certificate/f83580e6-3cbf-45bb-90de-1cf7d30bfc94"
 
 # =========================================================
-# EKS NODE CONFIG (ADD THIS - IMPORTANT)
+# EKS
 # =========================================================
 
-node_instance_type = "t3.medium"
-node_min_size      = 1
-node_max_size      = 3
-node_desired_size  = 2
+cluster_name = "devops-cluster"
+
+node_group_name = "dev-node-group"
+
+instance_types = ["t3.medium"]
+
+desired_size = 2
+min_size     = 1
+max_size     = 3

@@ -37,23 +37,37 @@ module "vpc" {
 # =========================================================
 # EKS MODULE
 # =========================================================
+# =========================================================
+# EKS MODULE
+# =========================================================
 
 module "eks" {
 
   source = "../../modules/eks"
 
-  aws_region      = var.aws_region
-  environment     = var.environment
-  private_subnets = module.vpc.private_subnet_ids
-}
+  aws_region  = var.aws_region
+  environment = var.environment
 
+  cluster_name       = var.cluster_name
+  kubernetes_version = var.kubernetes_version
+  private_subnets    = module.vpc.private_subnet_ids
+
+  node_group_name = var.node_group_name
+
+  instance_types = var.instance_types
+
+  desired_size = var.desired_size
+  min_size     = var.min_size
+  max_size     = var.max_size
+}
 # =========================================================
 # VPN MODULE
 # =========================================================
 
 module "vpn" {
 
-  source = "../../modules/vpn"
+  source      = "../../modules/vpn"
+  environment = var.environment
 
   vpc_id          = module.vpc.vpc_id
   vpc_cidr        = module.vpc.vpc_cidr

@@ -35,7 +35,7 @@ resource "aws_security_group" "vpn_sg" {
 resource "aws_ec2_client_vpn_endpoint" "this" {
 
   count = var.enabled ? 1 : 0
-
+  vpc_id = var.vpc_id
   description            = "${var.environment}-client-vpn"
   server_certificate_arn = var.server_certificate_arn
   client_cidr_block      = var.client_cidr_block
