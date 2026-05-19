@@ -34,7 +34,7 @@ spec:
 
         - name: frontend
 
-          image: FRONTEND_IMAGE
+          image: 744804011934.dkr.ecr.eu-west-1.amazonaws.com/frontend:latest
 
           imagePullPolicy: Always
 
