@@ -4,7 +4,10 @@ persistence:
 controller:
   admin:
     username: admin
-    password: "${JENKINS_ADMIN_PASSWORD}"
+    password: admin123
+#     password:    "${JENKINS_ADMIN_PASSWORD}"
+
+
 
   serviceType: ClusterIP
 
