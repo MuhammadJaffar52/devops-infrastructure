@@ -1,131 +1,317 @@
-# DevOps Infrastructure Platform
+# 🚀 Enterprise DevOps Platform on AWS EKS
 
-Enterprise-grade AWS DevOps Infrastructure Platform built using:
+## Overview
 
-* Terraform
-* AWS EKS
-* Kubernetes
-* Helm
-* Jenkins
-* Kaniko
-* Trivy Operator
-* Prometheus
-* Grafana
-* Loki
-* AWS Client VPN
-* External Secrets
-* IRSA (IAM Roles for Service Accounts)
+This project demonstrates the design, automation, deployment, monitoring, security, and management of a production-style Kubernetes platform on AWS.
 
-This project provides a fully automated, reusable, 
-and portable DevOps infrastructure platform
-designed for secure Kubernetes-based 
-application deployment on AWS.
+The platform is built using Infrastructure as Code (IaC) principles and follows modern DevOps practices including:
 
----
-
-# Project Goals
-
-This platform provides:
-
-* Infrastructure as Code (IaC)
-* Secure private Kubernetes infrastructure
-* CI/CD automation
+* Terraform-based infrastructure provisioning
+* Private Amazon EKS cluster deployment
+* Jenkins CI/CD automation
+* Kubernetes application deployment
+* Centralized logging
+* Monitoring and observability
 * Security scanning
-* Monitoring & observability
-* Environment portability
-* Multi-account AWS support
-* Multi-region deployment support
-* Production-grade architecture
+* Secrets management
+* VPN-only administrative access
+
+The objective is to simulate a real-world enterprise DevOps environment where infrastructure, applications, monitoring, and security are managed through automation.
 
 ---
 
 # Architecture Overview
 
-The platform consists of:
+## Infrastructure Layer
 
-## Infrastructure Layer (Terraform)
+Provisioned using Terraform.
 
-Terraform provisions:
+### AWS Resources
 
 * VPC
-* Public & private subnets
+* Public Subnets
+* Private Subnets
+* Internet Gateway
 * NAT Gateway
-* Route tables
-* EKS cluster
-* Node groups
-* IAM roles
-* OIDC provider
-* IRSA roles
+* Route Tables
+* Security Groups
+* IAM Roles & Policies
+* IAM OIDC Provider
+* Amazon EKS Cluster
+* Managed Node Groups
 * AWS Client VPN
-* ECR repositories
+* Amazon ECR Repositories
 
 ---
 
 ## Kubernetes Layer
 
-Kubernetes workloads include:
+### Application Namespace
 
-* Frontend application
-* Backend API
-* MongoDB StatefulSet
-* Jenkins
-* Monitoring stack
-* External Secrets
-* Trivy Operator
+Deployed application stack:
+
+#### Frontend
+
+* Kubernetes Deployment
+* Kubernetes Service
+* ALB Ingress
+
+#### Backend API
+
+* Kubernetes Deployment
+* Kubernetes Service
+
+#### MongoDB
+
+* StatefulSet
+* Persistent Storage
+* Internal Cluster Service
 
 ---
 
-## Monitoring Stack
+## CI/CD Platform
 
-Monitoring includes:
+### Jenkins
 
-* Prometheus
-* Grafana
-* Loki
-* Promtail
-* Node Exporter
+Dedicated Jenkins deployment running inside Kubernetes.
+
+Capabilities:
+
+* Source Code Checkout
+* Pull Request Validation
+* Automated Build
+* Docker Image Creation
+* Image Push to ECR
+* Kubernetes Deployment Automation
+
+### Jenkins Agents
+
+Separate node group created specifically for CI/CD workloads.
+
+Benefits:
+
+* Isolated build workloads
+* Better scalability
+* Reduced impact on application nodes
 
 ---
 
-## Security Stack
+# Monitoring & Observability
 
-Security components include:
+## Grafana
 
-* Trivy Operator
-* Trivy filesystem scanning
-* IRSA
+Provides dashboards for:
+
+* Cluster monitoring
+* Application monitoring
+* Infrastructure visibility
+
+Deployment:
+
+* Kubernetes Deployment
+* ClusterIP Service
+* Access through VPN + Port Forwarding
+
+---
+
+## Loki
+
+Centralized log aggregation platform.
+
+Collects:
+
+* Kubernetes Pod Logs
+* Application Logs
+* System Logs
+
+---
+
+## Promtail
+
+Runs as DaemonSet.
+
+Responsibilities:
+
+* Collect node logs
+* Collect container logs
+* Forward logs to Loki
+
+---
+
+# Code Quality Platform
+
+## SonarQube
+
+Deployed inside Kubernetes using Helm.
+
+Capabilities:
+
+* Static Code Analysis
+* Code Smell Detection
+* Bug Detection
+* Security Vulnerability Analysis
+* Technical Debt Reporting
+* Quality Gates
+
+Current Deployment:
+
+* SonarQube Community Edition
+* Kubernetes StatefulSet
+* ClusterIP Service
+* Internal Access Only
+
+---
+
+# Security Architecture
+
+## External Secrets Operator
+
+Secrets are stored securely in:
+
 * AWS Secrets Manager
-* External Secrets Operator
-* Private VPN-only cluster access
+
+Automatically synchronized into Kubernetes secrets.
 
 ---
 
-# Project Structure
+## IRSA
+
+IAM Roles for Service Accounts
+
+Benefits:
+
+* No static AWS credentials
+* Least privilege access
+* Secure AWS authentication from pods
+
+---
+
+## Trivy Security Scanning
+
+Security scanning architecture prepared for:
+
+* Container Images
+* Kubernetes Resources
+* Configuration Auditing
+* Vulnerability Reporting
+
+---
+
+# VPN Architecture
+
+## AWS Client VPN
+
+Administrative access to infrastructure is provided through AWS Client VPN.
+
+### Accessible Through VPN
+
+* Jenkins
+* Grafana
+* SonarQube
+* Internal Kubernetes Services
+* EKS API Access
+
+### Benefits
+
+* No public dashboards
+* Secure administrative access
+* Private cluster management
+* Reduced attack surface
+
+---
+
+# Current Kubernetes Resources
+
+## Namespaces
+
+* app
+* monitoring
+* jenkins
+* sonarqube
+* external-secrets
+* kube-system
+
+---
+
+## Application Components
+
+### Frontend
+
+* 2 Replicas
+* Kubernetes Deployment
+* ALB Ingress
+
+### Backend
+
+* 2 Replicas
+* Kubernetes Deployment
+
+### MongoDB
+
+* StatefulSet
+
+---
+
+## Monitoring Components
+
+### Grafana
+
+Visualization Platform
+
+### Loki
+
+Centralized Logging
+
+### Promtail
+
+Log Collection
+
+---
+
+## DevOps Components
+
+### Jenkins
+
+CI/CD Server
+
+### Jenkins Agent
+
+Build Executors
+
+---
+
+## Quality Components
+
+### SonarQube
+
+Code Quality & Security Analysis
+
+---
+
+# Repository Structure
 
 ```text
 devops-infrastructure/
 
 ├── apps/
-│   ├── backend/
-│   └── frontend/
+│   ├── frontend/
+│   └── backend/
 │
 ├── docs/
 │   └── runbooks/
 │
 ├── helm/
-│   ├── helmfile.yaml
 │   ├── releases/
 │   └── values/
 │
 ├── jenkins/
 │   └── pipelines/
-│       └── frontend.Jenkinsfile
 │
 ├── k8s/
 │   ├── apps/
-│   ├── base/
 │   ├── monitoring/
-│   └── platform/
+│   ├── platform/
+│   └── base/
 │
 ├── scripts/
 │   ├── bootstrap.sh
@@ -139,8 +325,8 @@ devops-infrastructure/
 │   │   ├── staging/
 │   │   └── prod/
 │   │
-│   ├── global/
 │   ├── modules/
+│   ├── global/
 │   └── policies/
 │
 └── .env.example
@@ -148,431 +334,154 @@ devops-infrastructure/
 
 ---
 
-# Technologies Used
+# Deployment Workflow
 
-| Technology       | Purpose                        |
-| ---------------- | ------------------------------ |
-| Terraform        | Infrastructure provisioning    |
-| AWS EKS          | Kubernetes cluster             |
-| Kubernetes       | Container orchestration        |
-| Helm             | Kubernetes package management  |
-| Helmfile         | Multi-release Helm deployments |
-| Jenkins          | CI/CD automation               |
-| Kaniko           | Container image builds         |
-| Trivy            | Security scanning              |
-| Prometheus       | Metrics collection             |
-| Grafana          | Visualization                  |
-| Loki             | Centralized logging            |
-| External Secrets | Secret synchronization         |
-| AWS Client VPN   | Secure private access          |
-| ECR              | Container registry             |
-
----
-
-# Infrastructure Design
-
-## VPC
-
-The platform deploys a custom VPC including:
-
-* Public subnets
-* Private subnets
-* Internet Gateway
-* NAT Gateway
-* Route tables
+```text
+Developer
+    │
+    ▼
+GitHub Repository
+    │
+    ▼
+Jenkins Pipeline
+    │
+    ├── Source Checkout
+    ├── SonarQube Analysis
+    ├── Security Scan
+    ├── Build Image
+    ├── Push Image to ECR
+    │
+    ▼
+Kubernetes Deployment
+    │
+    ▼
+Amazon EKS
+```
 
 ---
 
-## EKS Cluster
+# Monitoring Flow
 
-The EKS cluster includes:
-
-* Managed node groups
-* Separate Jenkins node group
-* OIDC provider
-* IRSA integration
-* AWS Load Balancer Controller support
-
----
-
-## VPN Architecture
-
-The entire platform is designed as a:
-
-PRIVATE DEVOPS PLATFORM
-
-Applications and dashboards are accessible only through AWS Client VPN.
-
-This ensures:
-
-* private cluster access
-* secure admin access
-* internal-only services
-* restricted exposure
-
----
-
-# CI/CD Pipeline
-
-The Jenkins pipeline performs:
-
-1. Source code checkout
-2. Trivy filesystem scan
-3. Docker image build using Kaniko
-4. Push image to ECR
-5. Deploy updated image to Kubernetes
+```text
+Applications
+      │
+      ▼
+ Promtail
+      │
+      ▼
+   Loki
+      │
+      ▼
+ Grafana
+```
 
 ---
 
 # Security Features
 
-## Trivy Operator
-
-Automatically scans:
-
-* workloads
-* containers
-* RBAC
-* Kubernetes configurations
-
----
-
-## External Secrets
-
-Secrets are stored in:
-
-AWS Secrets Manager
-
-And synchronized automatically into Kubernetes.
-
----
-
-## IRSA
-
-IAM Roles for Service Accounts are used to avoid static AWS credentials inside pods.
-
----
-
-# Monitoring Features
-
-## Prometheus
-
-Collects metrics from:
-
-* Kubernetes
-* Nodes
-* Applications
-
----
-
-## Grafana
-
-Provides dashboards for:
-
-* cluster metrics
-* node metrics
-* application monitoring
-
----
-
-## Loki
-
-Provides centralized log aggregation.
-
----
-
-# Environment Portability
-
-This project supports:
-
-dev
-staging
-production
-
-Each environment contains isolated Terraform configuration.
-
----
-
-# AWS Account Portability
-
-The platform supports dynamic AWS account detection using:
-
-data "aws_caller_identity" "current" {}
-```
-
-This removes hardcoded account dependency.
-
----
-
-# Region Portability
-
-The project supports dynamic region configuration using:
-
-provider "aws" {
-  region = var.aws_region
-}
-```
-
----
-
-# Prerequisites
-
-Before deployment ensure the following tools are installed:
-
-| Tool      | Required |
-| --------- | -------- |
-| AWS CLI   | Yes      |
-| kubectl   | Yes      |
-| Terraform | Yes      |
-| Helm      | Yes      |
-| Helmfile  | Yes      |
-| Git       | Yes      |
-
----
-
-# AWS Requirements
-
-The AWS account must have permissions for:
-
-* EKS
-* EC2
-* IAM
-* ECR
-* ACM
-* Route53 (optional)
-* CloudWatch
-* Secrets Manager
-
----
-
-# Initial Setup
-
-## Step 1 — Clone Repository
-
-```bash
-git clone https://github.com/MuhammadJaffar52/devops-infrastructure.git
-
-cd devops-infrastructure
-```
-
----
-
-## Step 2 — Configure AWS Credentials
-
-```bash
-aws configure
-
-Provide:
-
-* AWS Access Key
-* AWS Secret Key
-* Default region
-* Output format
-
----
-
-## Step 3 — Verify AWS Access
-
-```bash
-aws sts get-caller-identity
-```
-
----
-
-## Step 4 — Create Environment File
-
-Copy:
-
-```bash
-cp .env.example .env
-```
-
----
-
-## Step 5 — Configure Variables
-
-Edit the environment file:
-
-nano .env
-
-Example:
-
-AWS_REGION=eu-west-1
-ENVIRONMENT=dev
-```
-
----
-
-# Terraform Deployment
-
-## Initialize Terraform
-
-```bash
-cd terraform/environments/dev
-Initialize Terraform
-terraform init
-Validate Terraform
-terraform validate
-Review Infrastructure Plan
-terraform plan
-Deploy Infrastructure
-terraform apply -auto-approve
-```
-
----
-
-# Automated Bootstrap Deployment
-
-The entire platform can be deployed automatically using:
-
-ENVIRONMENT=dev ./scripts/bootstrap.sh
-
-This script performs:
-
-* Terraform initialization
-* Infrastructure provisioning
-* kubeconfig setup
-* Helm deployments
-
----
-
-# Kubernetes Validation
-
-Validate cluster resources:
-
-```bash
-bash scripts/validate.sh
-```
-
----
-
-# Jenkins Access
-
-Port forward Jenkins:
-
-```bash
-kubectl port-forward svc/jenkins -n jenkins 8080:8080
-
-Access:
-
-http://localhost:8080
-```
-
----
-
-# Grafana Access
-
-Port forward Grafana:
-
-```bash
-kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
-
-Access:
-
-http://localhost:3000
-```
-
----
-
-# Prometheus Access
-
-```bash
-kubectl port-forward svc/monitoring-kube-prometheus-prometheus \
--n monitoring 9090:9090
-
-Access:
-
-http://localhost:9090
-```
-
----
-
-# Trivy Operator Validation
-
-Verify operator:
-
-kubectl get pods -n trivy-system
-
-Check vulnerability reports:
-
-kubectl get vulnerabilityreports -A
-
-Check configuration audit reports:
-
-kubectl get configauditreports -A
-```
-
----
-
-# Deployment Workflow
-
-Typical workflow:
-
-1. Push code to GitHub
-2. Jenkins pipeline triggers
-3. Trivy scan executes
-4. Kaniko builds image
-5. Image pushed to ECR
-6. Kubernetes deployment updated
-7. Monitoring tracks workloads
-8. Trivy Operator scans workloads continuously
-
----
-
-# Destroy Infrastructure
-
-To destroy infrastructure:
-
-```bash
-./scripts/destroy.sh
-```
-
----
-
-# Future Improvements
-
-Planned enhancements:
-
-* GitHub Actions support
-* ArgoCD GitOps
-* Multi-region failover
-* WAF integration
-* Automated backups
-* Service mesh
-* Production ingress
-* Terraform remote state locking
-* Advanced RBAC hardening
-
----
-
-# Security Notes
-
-This repository intentionally excludes:
-
-AWS credentials
-VPN private keys
-secrets
-sensitive environment variables
-
-Secrets are securely managed using:
-
-* AWS Secrets Manager
+* Private EKS Cluster
+* AWS Client VPN Access
+* IRSA Authentication
+* Secrets Manager Integration
 * External Secrets Operator
+* SonarQube Code Analysis
+* Trivy Security Scanning
+* Least Privilege IAM Design
 
 ---
 
-# Production Readiness
+# Environment Support
 
-Current platform capabilities:
+Supported environments:
 
-* Infrastructure automation
-* Private Kubernetes platform
-* CI/CD pipelines
-* Security scanning
-* Monitoring
-* Logging
-* VPN-only access
-* Environment portability
-* AWS account portability
+* Development
+* Staging
+* Production
 
+Each environment uses isolated Terraform configurations.
 
+---
+
+# AWS Services Used
+
+* Amazon EKS
+* Amazon EC2
+* Amazon VPC
+* Amazon IAM
+* Amazon ECR
+* AWS Client VPN
+* AWS ACM
+* AWS Secrets Manager
+* CloudWatch
+* Elastic Load Balancer
+
+---
+
+# Current Platform Status
+
+### Infrastructure
+
+✅ VPC Provisioned
+
+✅ EKS Cluster Running
+
+✅ Managed Node Groups Running
+
+✅ AWS Client VPN Operational
+
+### Applications
+
+✅ Frontend Running
+
+✅ Backend Running
+
+✅ MongoDB Running
+
+### DevOps
+
+✅ Jenkins Running
+
+✅ CI/CD Pipelines Configured
+
+### Monitoring
+
+✅ Grafana Running
+
+✅ Loki Running
+
+✅ Promtail Running
+
+### Quality
+
+✅ SonarQube Running
+
+### Security
+
+✅ External Secrets Running
+
+✅ IRSA Configured
+
+---
+
+# Future Enhancements
+
+* ArgoCD GitOps
+* Prometheus Stack
+* Metrics Server
+* Cluster Autoscaler
+* Velero Backup & Recovery
+* Multi-Region DR
+* WAF Integration
+* Advanced RBAC
+* Service Mesh (Istio)
+* GitHub Actions Support
+
+---
+
+# Author
+
+Muhammad Jaffar
+
+DevOps Engineer
+
+AWS • Kubernetes • Terraform • Jenkins • Observability • Security
