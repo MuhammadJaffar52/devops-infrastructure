@@ -357,6 +357,23 @@ EOF
             }
         }
 
+
+        stage('Trivy Image Scan') {
+  steps {
+    container('trivy') {
+      script {
+        sh """
+        trivy image \
+          --severity ${TRIVY_SEVERITY} \
+          --exit-code ${TRIVY_EXIT_CODE} \
+          --no-progress \
+          --format table \
+          ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_ECR_REPO}:${BUILD_NUMBER}
+        """
+      }
+    }
+  }
+}
         stage('Deploy To Kubernetes') {
 
             steps {
