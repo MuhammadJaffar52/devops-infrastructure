@@ -54,4 +54,4 @@ instance_types = ["t3.large"]
 
 desired_size = 3
 min_size     = 1
-max_size     = 3
+max_size     = 6
