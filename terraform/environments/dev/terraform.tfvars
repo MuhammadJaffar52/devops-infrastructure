@@ -50,8 +50,8 @@ cluster_name = "devops-cluster"
 
 node_group_name = "dev-node-group"
 
-instance_types = ["t3.medium"]
+instance_types = ["t3.large"]
 
-desired_size = 2
+desired_size = 3
 min_size     = 1
 max_size     = 3

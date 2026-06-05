@@ -4,7 +4,6 @@ metadata:
   name: grafana-loki-datasource
   namespace: monitoring
   labels:
-    grafana_datasource: "1"
 
 data:
   loki-datasource.yaml: |-
@@ -14,6 +13,6 @@ data:
         type: loki
         access: proxy
         url: http://loki.monitoring.svc.cluster.local:3100
-        isDefault: true
+        isDefault: false
         version: 1
         editable: false
