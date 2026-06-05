@@ -17,7 +17,7 @@ spec:
   containers:
 
     - name: trivy
-      image: aquasec/trivy:latest
+      image: aquasec/trivy:0.66.0
       command:
         - cat
       tty: true
@@ -177,6 +177,24 @@ spec:
                             returnStdout: true
                         ).trim()
 
+                        env.TRIVY_SEVERITY = sh(
+                            script: '''
+                                export ENVIRONMENT=${ENVIRONMENT}
+                                . scripts/load-env.sh >/dev/null 2>&1
+                                echo -n $TRIVY_SEVERITY
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        env.TRIVY_EXIT_CODE = sh(
+                            script: '''
+                                export ENVIRONMENT=${ENVIRONMENT}
+                                . scripts/load-env.sh >/dev/null 2>&1
+                                echo -n $TRIVY_EXIT_CODE
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
                         echo "======================================"
                         echo " APPLICATION CONFIGURATION"
                         echo "======================================"
@@ -192,6 +210,8 @@ spec:
                         echo "APP_DOCKERFILE=${env.APP_DOCKERFILE}"
                         echo "APP_K8S_PATH=${env.APP_K8S_PATH}"
                         echo "IMAGE_TAG=${env.IMAGE_TAG}"
+                        echo "TRIVY_SEVERITY=${env.TRIVY_SEVERITY}"
+                        echo "TRIVY_EXIT_CODE=${env.TRIVY_EXIT_CODE}"
 
                         echo "======================================"
 
@@ -217,6 +237,14 @@ spec:
 
                         if (!env.APP_K8S_PATH?.trim()) {
                             error("APP_K8S_PATH is missing")
+                        }
+
+                        if (!env.TRIVY_SEVERITY?.trim()) {
+                            error("TRIVY_SEVERITY is missing")
+                        }
+
+                        if (!env.TRIVY_EXIT_CODE?.trim()) {
+                            error("TRIVY_EXIT_CODE is missing")
                         }
 
                         echo "Application configuration loaded successfully"
@@ -270,8 +298,33 @@ spec:
                 container('trivy') {
 
                     sh '''
-                        trivy fs .
+                        set -e
+
+                        echo "======================================"
+                        echo "TRIVY SECURITY SCAN"
+                        echo "======================================"
+
+                        mkdir -p reports
+
+                        trivy fs \
+                          --severity ${TRIVY_SEVERITY} \
+                          --exit-code ${TRIVY_EXIT_CODE} \
+                          --no-progress \
+                          --format table \
+                          --output reports/trivy-report.txt \
+                          ${WORKSPACE}/${APP_DOCKER_CONTEXT}
+
+                        echo ""
+                        echo "========= TRIVY REPORT ========="
+                        cat reports/trivy-report.txt
+                        echo "==============================="
                     '''
+                }
+            }
+
+            post {
+                always {
+                    archiveArtifacts artifacts: 'reports/trivy-report.txt', allowEmptyArchive: true
                 }
             }
         }
